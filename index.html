@@ -327,10 +327,16 @@ function mapCat(v,t){const s=(v||'').toLowerCase();return /morg|früh|frueh|brea
 function toRow(t,it,date){const r={created_at:toTs(date,it.time)};
  if(t==='meal'){r.meal_type=it.category;r.description=it.title;if(sbExt.meal){r.calories=it.calories;r.notes=it.notes||null}}
  else{r.type=it.name;r.amount_ml=it.amount;if(sbExt.fluid)r.icon=it.icon}return r}
-async function sbDetect(){if(sbExtChecked)return;
+async function sbDetect(){if(sbExtChecked&&sbExt.meal&&sbExt.fluid)return;
  for(const [t,c] of [['meal','id,calories,notes'],['fluid','id,icon']]){const {error}=await sb.from(SB_T[t]).select(c).limit(1);
   const missing=error&&(['42703','PGRST204','PGRST100'].includes(error.code)||/column .* does not exist|could not find .* column/i.test(error.message||''));
-  if(error&&!missing)throw error;sbExt[t]=!error}sbExtChecked=true}
+  if(error&&!missing)throw error;sbExt[t]=!error}sbExtChecked=true;
+ // Spalten neu vorhanden: lokale Kalorien/Notizen/Icons einmalig nachträglich hochladen
+ let was={};try{was=JSON.parse(store.get('nutritrack_sb_ext'))||{}}catch(e){}
+ for(const d of Object.values(logs)){
+  if(sbExt.meal&&!was.meal)d.meals.forEach(m=>{if(m.sid!=null&&(m.calories!=null||m.notes))m.dirty=true});
+  if(sbExt.fluid&&!was.fluid)d.fluids.forEach(f=>{if(f.sid!=null&&f.icon)f.dirty=true})}
+ store.set('nutritrack_sb_ext',JSON.stringify(sbExt))}
 async function sbInsert(t,row){let {data,error}=await sb.from(SB_T[t]).insert(row).select('id').single();
  if(error&&error.code==='23502'&&/"id"/.test(error.message))({data,error}=await sb.from(SB_T[t]).insert({...row,id:Date.now()*1000+Math.floor(Math.random()*1000)}).select('id').single());
  if(error)throw error;return data.id}
