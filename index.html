@@ -43,8 +43,11 @@ body{background:#f8fafc;font-family:Inter,system-ui,-apple-system,"Segoe UI",san
    <div id="catCounts" class="grid grid-cols-4 text-center mt-3 pt-3 border-t border-slate-100 text-xs"></div>
   </div>
   <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
-   <span class="text-xs font-bold uppercase text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full">Geschätzte Energie</span>
-   <h3 class="text-2xl font-bold mt-2"><span id="kcal">0</span> <span class="text-sm font-normal text-slate-500">kcal</span></h3>
+   <div class="flex justify-between"><span class="text-xs font-bold uppercase text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full">Geschätzte Energie</span>
+    <button id="kGoalBtn" title="Kalorienziel festlegen">⚙️</button></div>
+   <h3 class="text-2xl font-bold mt-2"><span id="kcal">0</span> <span id="kUnit" class="text-sm font-normal text-slate-500">kcal</span><span id="kGoalTxt" class="text-sm font-normal text-slate-500"></span></h3>
+   <div id="kBarWrap" class="hidden mt-3"><div class="flex justify-between text-xs font-semibold text-slate-500 mb-1"><span>Tagesziel</span><span id="kPct">0%</span></div>
+    <div class="bg-slate-100 h-3 rounded-full overflow-hidden"><div id="kBar" class="bg-gradient-to-r from-amber-400 to-orange-500 h-full rounded-full transition-all duration-500" style="width:0"></div></div></div>
    <p class="text-xs text-slate-500 mt-2">Kalorienangaben sind optional und nur grobe Orientierung.</p>
   </div>
  </div>
@@ -115,13 +118,21 @@ body{background:#f8fafc;font-family:Inter,system-ui,-apple-system,"Segoe UI",san
 <section class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-3">
   <div class="flex justify-between flex-wrap gap-2 border-b border-slate-100 pb-3">
    <div><h2 class="font-bold text-lg">🔥 Kalorien Wochenverlauf</h2><p class="text-xs text-slate-500">Geschätzte Energie der letzten 7 Tage · <span id="kAvg">Ø –</span></p></div>
-   <div class="text-xs text-slate-600"><span class="inline-block w-3 h-3 rounded-full bg-amber-500"></span> kcal pro Tag</div>
+   <div class="text-xs text-slate-600"><span class="inline-block w-3 h-3 rounded-full bg-amber-500"></span> kcal pro Tag <span id="kLeg" class="hidden ml-3"><span class="inline-block w-3 h-3 rounded-full bg-slate-300"></span> Ziel (<span id="kLegV"></span> kcal)</span></div>
   </div>
   <div class="h-64 relative"><canvas id="chartKcal"></canvas></div>
  </section>
 </main>
 
 <footer class="text-center text-xs text-slate-400 py-6">NutriTrack · Daten bleiben lokal in diesem Browser.</footer>
+
+<div id="kModal" class="fixed inset-0 bg-slate-900/40 z-50 hidden items-center justify-center p-4">
+ <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4">
+  <div class="flex justify-between"><h3 class="font-bold">Tagesziel Kalorien</h3><button id="kClose">✕</button></div>
+  <div><label class="block text-xs font-semibold text-slate-600 mb-1">Ziel in Kilokalorien (kcal)</label><input id="kGoalIn" type="number" step="50" min="500" max="10000" placeholder="z. B. 2000" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl"></div>
+  <div class="flex gap-2"><button id="kSave" class="flex-grow py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-semibold">Speichern</button><button id="kClear" class="px-4 py-2 text-sm text-slate-500 hover:text-slate-700">Ziel entfernen</button></div>
+ </div>
+</div>
 
 <div id="timeModal" class="fixed inset-0 bg-slate-900/40 z-50 hidden items-center justify-center p-4">
  <form id="tForm" class="bg-white rounded-2xl max-w-xs w-full p-6 space-y-4">
@@ -181,7 +192,7 @@ function renderQuick(){
  $('quick').innerHTML=QUICK.length?QUICK.map((q,i)=>tile(q,i,'q','sky',q[1]+' ml',editQ)).join(''):empty;
  $('quickFood').innerHTML=FOOD.length?FOOD.map((f,i)=>tile(f,i,'f','emerald',(f[1]!=null?'ca. '+f[1]+' kcal':'–')+(f[3]?' · '+f[3]:''),editF)).join(''):empty;
 }
-let goal=parseInt(store.get('nutritrack_fluid_goal'))||2500, sel=fmt(new Date()), chart=null,chartK=null;
+let goal=parseInt(store.get('nutritrack_fluid_goal'))||2500, sel=fmt(new Date()), chart=null,chartK=null,kGoal=parseInt(store.get('nutritrack_kcal_goal'))||null;
 
 function fmt(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function parse(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)}
@@ -240,6 +251,10 @@ function init(){
  $('tTime').oninput=()=>{if(tCatAuto)$('tCat').value=autoCat($('tTime').value)};
  $('tCat').onchange=()=>{tCatAuto=false};
  $('tForm').onsubmit=e=>{e.preventDefault();const f=pendingAdd,t=$('tTime').value||nowT(),c=$('tCatWrap').classList.contains('hidden')?undefined:$('tCat').value;closeTime();if(f)f(t,c)};
+ $('kGoalBtn').onclick=()=>{$('kGoalIn').value=kGoal||'';$('kModal').classList.replace('hidden','flex')};
+ $('kClose').onclick=()=>$('kModal').classList.replace('flex','hidden');
+ $('kSave').onclick=()=>{const v=parseInt($('kGoalIn').value);if(v>=500&&v<=10000){kGoal=v;store.set('nutritrack_kcal_goal',v);$('kModal').classList.replace('flex','hidden');render()}};
+ $('kClear').onclick=()=>{kGoal=null;store.set('nutritrack_kcal_goal','');$('kModal').classList.replace('flex','hidden');render()};
  $('eClose').onclick=closeEdit;
  $('eForm').onsubmit=e=>{e.preventDefault();if(!editing)return;const it=findItem(editing.t,editing.id);if(!it)return closeEdit();
   const name=$('eName').value.trim();if(!name)return;
@@ -252,7 +267,11 @@ function render(){
  const d=day(sel), total=d.fluids.reduce((s,f)=>s+f.amount,0), pct=Math.min(100,Math.round(total/goal*100));
  $('tgt').textContent=goal;$('legTgt').textContent=goal;$('cur').textContent=total;$('pct').textContent=pct+'%';$('bar').style.width=pct+'%';
  $('mcount').textContent=d.meals.length;
- $('kcal').textContent=d.meals.reduce((s,m)=>s+(m.calories||0),0);
+ const kc=d.meals.reduce((s,m)=>s+(m.calories||0),0);$('kcal').textContent=kc;
+ $('kUnit').textContent=kGoal?'':'kcal';$('kGoalTxt').textContent=kGoal?' / '+kGoal+' kcal':'';
+ $('kBarWrap').classList.toggle('hidden',!kGoal);
+ if(kGoal){const kp=Math.min(100,Math.round(kc/kGoal*100));$('kPct').textContent=kp+'%';$('kBar').style.width=kp+'%'}
+ $('kLeg').classList.toggle('hidden',!kGoal);$('kLegV').textContent=kGoal||'';
  $('catCounts').innerHTML=CATS.map(c=>`<div><span class="block text-slate-400 text-[10px]">${c.k}</span><span class="font-bold">${d.meals.filter(m=>m.category===c.k).length}</span></div>`).join('');
  $('dlabel').textContent=parse(sel).toLocaleDateString('de-DE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
  const del=(fn,id)=>{const t=fn==='delMeal'?'meal':'fluid';return `<button onclick="openEdit('${t}',${id})" class="text-slate-400 hover:text-sky-600 p-1" title="Bearbeiten" aria-label="Bearbeiten">✏️</button><button onclick="${fn}(${id})" class="text-slate-400 hover:text-red-500 p-1" title="Löschen" aria-label="Löschen">🗑️</button>`};
@@ -278,7 +297,7 @@ function drawChart(){
  const used=k.filter(v=>v>0);
  $('kAvg').textContent=used.length?'Ø '+Math.round(used.reduce((a,b)=>a+b,0)/used.length)+' kcal an Tagen mit Einträgen':'Ø –';
  if(chartK)chartK.destroy();
- chartK=new Chart($('chartKcal').getContext('2d'),{type:'bar',data:{labels,datasets:[{label:'Kalorien (kcal)',data:k,backgroundColor:'#f59e0b',borderRadius:8,maxBarThickness:32}]},
+ chartK=new Chart($('chartKcal').getContext('2d'),{type:'bar',data:{labels,datasets:[{label:'Kalorien (kcal)',data:k,backgroundColor:'#f59e0b',borderRadius:8,maxBarThickness:32},...(kGoal?[{label:'Ziel (kcal)',data:k.map(()=>kGoal),type:'line',borderColor:'#cbd5e1',borderWidth:2,borderDash:[5,5],pointRadius:0}]:[])]},
   options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+' kcal'}}},scales:{y:{beginAtZero:true,grid:{color:'#f1f5f9'}},x:{grid:{display:false}}}}});
 }
 init();render();
