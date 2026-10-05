@@ -100,12 +100,20 @@ body{background:#f8fafc;font-family:Inter,system-ui,-apple-system,"Segoe UI",san
    </form>
   </section>
 
-  <section class="lg:col-span-2 bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-5">
-   <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-    <h2 class="font-bold text-lg">📋 Tagesprotokoll</h2><span id="dlabel" class="text-xs font-semibold px-2.5 py-1 bg-slate-100 rounded-lg"></span>
-   </div>
-   <div id="log" class="space-y-5"></div>
-  </section>
+  <div class="lg:col-span-2 grid md:grid-cols-2 gap-6 items-start">
+   <section class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-5">
+    <div class="flex items-center justify-between flex-wrap gap-2 border-b border-slate-100 pb-3">
+     <h2 class="font-bold text-lg">🍽️ Essensprotokoll</h2><span id="dlabel" class="text-xs font-semibold px-2.5 py-1 bg-slate-100 rounded-lg"></span>
+    </div>
+    <div id="log" class="space-y-5"></div>
+   </section>
+   <section class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-5">
+    <div class="flex items-center justify-between flex-wrap gap-2 border-b border-slate-100 pb-3">
+     <h2 class="font-bold text-lg">💧 Trinkprotokoll</h2><span id="dlabel2" class="text-xs font-semibold px-2.5 py-1 bg-slate-100 rounded-lg"></span>
+    </div>
+    <div id="logFluid" class="space-y-2"></div>
+   </section>
+  </div>
  </div>
 
  <section class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-3">
@@ -430,14 +438,14 @@ function render(){
  if(kGoal){const kp=Math.min(100,Math.round(kc/kGoal*100));$('kPct').textContent=kp+'%';$('kBar').style.width=kp+'%'}
  $('kLeg').classList.toggle('hidden',!kGoal);$('kLegV').textContent=kGoal||'';
  $('catCounts').innerHTML=CATS.map(c=>`<div><span class="block text-slate-400 text-[10px]">${c.k}</span><span class="font-bold">${d.meals.filter(m=>m.category===c.k).length}</span></div>`).join('');
- $('dlabel').textContent=parse(sel).toLocaleDateString('de-DE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+ $('dlabel').textContent=$('dlabel2').textContent=parse(sel).toLocaleDateString('de-DE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
  const del=(fn,id)=>{const t=fn==='delMeal'?'meal':'fluid';return `<button onclick="openEdit('${t}',${id})" class="text-slate-400 hover:text-sky-600 p-1" title="Bearbeiten" aria-label="Bearbeiten">✏️</button><button onclick="${fn}(${id})" class="text-slate-400 hover:text-red-500 p-1" title="Löschen" aria-label="Löschen">🗑️</button>`};
  let h=CATS.map(c=>{const ms=d.meals.filter(m=>m.category===c.k);
   return `<div class="space-y-2"><div class="flex justify-between text-xs font-bold uppercase text-${c.c}-600 bg-${c.c}-50 px-3 py-1.5 rounded-lg"><span>${c.e} ${c.t}</span><span class="font-medium">${ms.reduce((s,m)=>s+(m.calories||0),0)} kcal</span></div>`+
   (ms.length?ms.map(m=>`<div class="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50"><div><span class="text-xs font-bold">${esc(m.title)}</span> <span class="text-[10px] px-1.5 py-0.5 bg-slate-200 rounded-md">${m.time} Uhr</span>${m.notes?`<p class="text-xs text-slate-500">${esc(m.notes)}</p>`:''}</div><div class="flex items-center gap-2">${m.calories?`<span class="text-xs font-semibold bg-white px-2 py-1 rounded-lg border border-slate-200">${m.calories} kcal</span>`:''}${del('delMeal',m.id)}</div></div>`).join(''):'<p class="text-xs text-slate-400 italic">Keine Einträge vorhanden.</p>')+'</div>'}).join('');
- h+=`<div class="space-y-2 pt-3 border-t border-slate-100"><div class="flex justify-between text-xs font-bold uppercase text-sky-600 bg-sky-50 px-3 py-1.5 rounded-lg"><span>💧 Getränke des Tages</span><span class="font-medium">${total} ml</span></div>`+
-  (d.fluids.length?d.fluids.map(f=>`<div class="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-sky-50/40"><div><span class="text-xs font-bold">${ico(f.icon)} ${esc(f.name)}</span> <span class="text-[10px] text-slate-400">${f.time} Uhr</span></div><div class="flex items-center gap-2"><span class="text-xs font-bold text-sky-700">${f.amount} ml</span>${del('delFluid',f.id)}</div></div>`).join(''):'<p class="text-xs text-slate-400 italic">Noch keine Getränke erfasst.</p>')+'</div>';
  $('log').innerHTML=h;
+ $('logFluid').innerHTML=`<div class="flex justify-between text-xs font-bold uppercase text-sky-600 bg-sky-50 px-3 py-1.5 rounded-lg"><span>💧 Getränke des Tages</span><span class="font-medium">${total} ml</span></div>`+
+  (d.fluids.length?d.fluids.map(f=>`<div class="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-sky-50/40"><div><span class="text-xs font-bold">${ico(f.icon)} ${esc(f.name)}</span> <span class="text-[10px] text-slate-400">${f.time} Uhr</span></div><div class="flex items-center gap-2"><span class="text-xs font-bold text-sky-700">${f.amount} ml</span>${del('delFluid',f.id)}</div></div>`).join(''):'<p class="text-xs text-slate-400 italic">Noch keine Getränke erfasst.</p>');
  drawChart();
 }
 
