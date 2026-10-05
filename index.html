@@ -1,851 +1,566 @@
 <!DOCTYPE html>
-<html lang="de" class="h-full bg-slate-50">
+<html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ernährungs- & Trink-Tracker</title>
-    <!-- Tailwind CSS -->
+    <title>dwNutriTrack</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js -->
+    <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Supabase JS Client v2 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Font Inter -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                    colors: {
-                        brand: {
-                            50: '#f0f9ff',
-                            100: '#e0f2fe',
-                            500: '#0ea5e9',
-                            600: '#0284c7',
-                            700: '#0369a1',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    </style>
 </head>
-<body class="h-full text-slate-800 antialiased flex flex-col">
+<body class="bg-slate-900 text-slate-100 min-h-screen pb-12 font-sans">
 
-<div id="app" class="min-h-screen flex flex-col justify-between">
-    <!-- Header Navigation -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="bg-gradient-to-tr from-sky-500 to-indigo-600 p-2.5 rounded-xl text-white shadow-md">
-                    <i class="fa-solid font-bold fa-utensils text-lg"></i>
-                </div>
-                <div>
-                    <h1 class="text-xl font-bold text-slate-900 leading-tight">NutriTrack</h1>
-                    <p class="text-xs text-slate-500 font-medium">Dein Ess- & Trinking-Tagebuch</p>
-                </div>
+    <!-- Header / Navbar -->
+    <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-50 shadow-md">
+        <div class="max-w-3xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid font-bold text-emerald-400 text-xl fa-utensils"></i>
+                <h1 class="text-xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">dwNutriTrack</h1>
             </div>
-
-            <!-- Date Selector & Today Button -->
-            <div class="flex items-center space-x-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
-                <button id="prevDateBtn" class="p-1.5 hover:bg-white rounded-lg text-slate-600 transition shadow-sm" title="Vorheriger Tag">
-                    <i class="fa-solid fa-chevron-left text-xs"></i>
-                </button>
-                <input type="date" id="selectedDateInput" class="bg-transparent text-xs sm:text-sm font-semibold text-slate-700 focus:outline-none cursor-pointer text-center px-1">
-                <button id="nextDateBtn" class="p-1.5 hover:bg-white rounded-lg text-slate-600 transition shadow-sm" title="Nächster Tag">
-                    <i class="fa-solid fa-chevron-right text-xs"></i>
-                </button>
-                <button id="todayBtn" class="hidden sm:block text-xs font-semibold px-2.5 py-1 bg-white text-sky-600 rounded-lg shadow-sm hover:bg-sky-50 transition border border-slate-200">
-                    Heute
-                </button>
-            </div>
+            <button onclick="toggleConfigModal()" class="text-slate-400 hover:text-slate-200 transition p-2 rounded-lg hover:bg-slate-700">
+                <i class="fa-solid fa-gear text-lg"></i>
+            </button>
         </div>
     </header>
 
-    <!-- Main Content Container -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full space-y-6">
+    <main class="max-w-3xl mx-auto px-4 py-6 space-y-8">
 
-        <!-- Top Stats Banner / Dashboard -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-            
-            <!-- Fluid Goal Card -->
-            <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
-                <div class="flex justify-between items-start mb-3">
-                    <div>
-                        <span class="text-xs font-bold uppercase tracking-wider text-sky-600 bg-sky-50 px-2.5 py-1 rounded-full">Flüssigkeit</span>
-                        <h3 class="text-2xl font-bold text-slate-800 mt-2"><span id="currentFluid">0</span> <span class="text-sm font-normal text-slate-500">/ <span id="targetFluid">2500</span> ml</span></h3>
-                    </div>
-                    <button id="editGoalBtn" class="text-slate-400 hover:text-sky-600 transition p-1" title="Tagesziel bearbeiten">
-                        <i class="fa-solid fa-gear text-base"></i>
-                    </button>
+        <!-- Datumsauswahl -->
+        <div class="bg-slate-800 rounded-2xl p-4 shadow-lg border border-slate-700 flex justify-between items-center">
+            <button onclick="changeDate(-1)" class="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition">
+                <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            <input type="date" id="selectedDate" onchange="loadDayData()" class="bg-slate-900 text-emerald-400 font-semibold px-3 py-1.5 rounded-xl border border-slate-700 focus:outline-none text-center">
+            <button onclick="changeDate(1)" class="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition">
+                <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        </div>
+
+        <!-- Tagesübersicht / Stats -->
+        <div class="grid grid-cols-2 gap-4">
+            <div class="bg-slate-800 rounded-2xl p-4 shadow-lg border border-slate-700 flex flex-col justify-between">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Flüssigkeit</span>
+                    <i class="fa-solid fa-glass-water text-cyan-400"></i>
                 </div>
-                <div>
-                    <div class="flex justify-between text-xs font-semibold text-slate-500 mb-1">
-                        <span>Fortschritt</span>
-                        <span id="fluidPercent">0%</span>
-                    </div>
-                    <div class="w-full bg-slate-100 h-3 rounded-full overflow-hidden p-0.5">
-                        <div id="fluidProgressBar" class="bg-gradient-to-r from-sky-400 to-blue-600 h-full rounded-full transition-all duration-500 w-0"></div>
-                    </div>
+                <div class="flex items-baseline space-x-1">
+                    <span id="totalWater" class="text-2xl font-extrabold text-cyan-400">0</span>
+                    <span class="text-xs text-slate-400">ml</span>
                 </div>
             </div>
-
-            <!-- Meals Summary Card -->
-            <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex flex-col justify-between">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <span class="text-xs font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">Mahlzeiten</span>
-                        <h3 class="text-2xl font-bold text-slate-800 mt-2"><span id="totalMealsCount">0</span> <span class="text-sm font-normal text-slate-500">Einträge</span></h3>
-                    </div>
-                    <div class="bg-emerald-50 text-emerald-600 p-3 rounded-xl">
-                        <i class="fa-solid fa-utensils text-lg"></i>
-                    </div>
+            <div class="bg-slate-800 rounded-2xl p-4 shadow-lg border border-slate-700 flex flex-col justify-between">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Mahlzeiten</span>
+                    <i class="fa-solid fa-bowl-food text-emerald-400"></i>
                 </div>
-                <div class="grid grid-cols-4 gap-1 text-center mt-3 pt-3 border-t border-slate-100 text-xs">
-                    <div>
-                        <span class="block text-slate-400 text-[10px]">Morgens</span>
-                        <span id="breakfastCount" class="font-bold text-slate-700">0</span>
-                    </div>
-                    <div>
-                        <span class="block text-slate-400 text-[10px]">Mittags</span>
-                        <span id="lunchCount" class="font-bold text-slate-700">0</span>
-                    </div>
-                    <div>
-                        <span class="block text-slate-400 text-[10px]">Abends</span>
-                        <span id="dinnerCount" class="font-bold text-slate-700">0</span>
-                    </div>
-                    <div>
-                        <span class="block text-slate-400 text-[10px]">Snacks</span>
-                        <span id="snackCount" class="font-bold text-slate-700">0</span>
-                    </div>
+                <div class="flex items-baseline space-x-1">
+                    <span id="totalMeals" class="text-2xl font-extrabold text-emerald-400">0</span>
+                    <span class="text-xs text-slate-400">Einträge</span>
                 </div>
-            </div>
-
-            <!-- Quick Stats & Energy Card -->
-            <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex flex-col justify-between">
-                <div class="flex justify-between items-start">
-                    <div>
-                        <span class="text-xs font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full">Geschätzte Energie</span>
-                        <h3 class="text-2xl font-bold text-slate-800 mt-2"><span id="totalCalories">0</span> <span class="text-sm font-normal text-slate-500">kcal</span></h3>
-                    </div>
-                    <div class="bg-amber-50 text-amber-600 p-3 rounded-xl">
-                        <i class="fa-solid fa-fire text-lg"></i>
-                    </div>
-                </div>
-                <p class="text-xs text-slate-500 mt-2">
-                    <i class="fa-solid fa-circle-info text-sky-500 mr-1"></i> Kalorienangaben sind optional und dienen als grobe Orientierung.
-                </p>
             </div>
         </div>
 
-        <!-- Quick Hydration Input Section -->
-        <div class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-4">
-            <div class="flex items-center justify-between">
-                <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-                    <i class="fa-solid fa-glass-water text-sky-500"></i> Trinken Schnellerfassung
+        <!-- SEKTION TRINKEN -->
+        <section class="bg-slate-800 rounded-2xl p-5 shadow-lg border border-slate-700 space-y-4">
+            <div class="flex justify-between items-center">
+                <h2 class="text-lg font-semibold flex items-center gap-2">
+                    <i class="fa-solid fa-bottle-water text-cyan-400"></i> Trinken Schnellerfassung
                 </h2>
-                <span class="text-xs text-slate-400">Ein Klick zum Hinzufügen</span>
-            </div>
-
-            <!-- Quick Buttons Grid -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-                <!-- Wasser 250ml -->
-                <button onclick="addFluid('Wasser', 250, 'fa-glass-water', 'sky')" class="group p-3 rounded-xl border border-slate-200 hover:border-sky-400 hover:bg-sky-50 transition flex flex-col items-center justify-center space-y-1 text-center">
-                    <div class="w-10 h-10 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center group-hover:scale-110 transition">
-                        <i class="fa-solid fa-glass-water text-base"></i>
-                    </div>
-                    <span class="text-xs font-semibold text-slate-700">Wasser</span>
-                    <span class="text-[11px] text-slate-400">250 ml</span>
-                </button>
-
-                <!-- Wasser 500ml -->
-                <button onclick="addFluid('Wasser', 500, 'fa-bottle-water', 'sky')" class="group p-3 rounded-xl border border-slate-200 hover:border-sky-400 hover:bg-sky-50 transition flex flex-col items-center justify-center space-y-1 text-center">
-                    <div class="w-10 h-10 rounded-full bg-sky-100 text-sky-600 flex items-center justify-center group-hover:scale-110 transition">
-                        <i class="fa-solid fa-bottle-water text-base"></i>
-                    </div>
-                    <span class="text-xs font-semibold text-slate-700">Flache Wasser</span>
-                    <span class="text-[11px] text-slate-400">500 ml</span>
-                </button>
-
-                <!-- Kaffee 150ml -->
-                <button onclick="addFluid('Kaffee', 150, 'fa-mug-hot', 'amber')" class="group p-3 rounded-xl border border-slate-200 hover:border-amber-400 hover:bg-amber-50 transition flex flex-col items-center justify-center space-y-1 text-center">
-                    <div class="w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center group-hover:scale-110 transition">
-                        <i class="fa-solid fa-mug-hot text-base"></i>
-                    </div>
-                    <span class="text-xs font-semibold text-slate-700">Kaffee</span>
-                    <span class="text-[11px] text-slate-400">150 ml</span>
-                </button>
-
-                <!-- Kaffee 250ml -->
-                <button onclick="addFluid('Großer Kaffee', 250, 'fa-mug-saucer', 'amber')" class="group p-3 rounded-xl border border-slate-200 hover:border-amber-400 hover:bg-amber-50 transition flex flex-col items-center justify-center space-y-1 text-center">
-                    <div class="w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center group-hover:scale-110 transition">
-                        <i class="fa-solid fa-mug-saucer text-base"></i>
-                    </div>
-                    <span class="text-xs font-semibold text-slate-700">Becher Kaffee</span>
-                    <span class="text-[11px] text-slate-400">250 ml</span>
-                </button>
-
-                <!-- Tee 250ml -->
-                <button onclick="addFluid('Tee', 250, 'fa-leaf', 'emerald')" class="group p-3 rounded-xl border border-slate-200 hover:border-emerald-400 hover:bg-emerald-50 transition flex flex-col items-center justify-center space-y-1 text-center">
-                    <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition">
-                        <i class="fa-solid fa-leaf text-base"></i>
-                    </div>
-                    <span class="text-xs font-semibold text-slate-700">Tee</span>
-                    <span class="text-[11px] text-slate-400">250 ml</span>
-                </button>
-
-                <!-- Softdrink/Saft 300ml -->
-                <button onclick="addFluid('Softdrink / Saft', 300, 'fa-whiskey-glass', 'purple')" class="group p-3 rounded-xl border border-slate-200 hover:border-purple-400 hover:bg-purple-50 transition flex flex-col items-center justify-center space-y-1 text-center">
-                    <div class="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center group-hover:scale-110 transition">
-                        <i class="fa-solid fa-whiskey-glass text-base"></i>
-                    </div>
-                    <span class="text-xs font-semibold text-slate-700">Softdrink/Saft</span>
-                    <span class="text-[11px] text-slate-400">300 ml</span>
+                <button onclick="toggleManageWater()" id="btnManageWater" class="text-xs bg-slate-700 hover:bg-slate-600 px-2.5 py-1 rounded-lg text-slate-300 transition">
+                    Verwalten
                 </button>
             </div>
 
-            <!-- Custom Fluid Input Form -->
-            <form id="customFluidForm" class="pt-2 flex flex-col sm:flex-row gap-3 items-center">
-                <div class="relative flex-grow w-full">
-                    <input type="text" id="customFluidName" placeholder="Anderes Getränk (z.B. Isodrink)" required class="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition">
-                    <i class="fa-solid fa-wine-bottle absolute left-3 top-3 text-slate-400 text-xs"></i>
-                </div>
-                <div class="relative w-full sm:w-36">
-                    <input type="number" id="customFluidAmount" placeholder="Menge" min="10" step="10" required class="w-full pl-3 pr-10 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition">
-                    <span class="absolute right-3 top-2.5 text-xs text-slate-400 font-medium">ml</span>
-                </div>
-                <button type="submit" class="w-full sm:w-auto px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-sm font-semibold transition flex items-center justify-center gap-1.5 shadow-sm">
-                    <i class="fa-solid fa-plus text-xs"></i> Hinzufügen
+            <!-- Kacheln Trinken -->
+            <div id="waterTiles" class="grid grid-cols-2 sm:grid-cols-4 gap-2"></div>
+
+            <!-- Manuelle Trinken-Eingabe -->
+            <div class="pt-2 flex gap-2">
+                <input type="text" id="customWaterType" placeholder="Getränk (z.B. Tee)" class="w-1/2 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-cyan-500">
+                <input type="number" id="customWaterAmount" placeholder="ml" class="w-1/4 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-cyan-500">
+                <button onclick="addCustomWater()" class="w-1/4 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-xl text-sm transition flex items-center justify-center gap-1">
+                    <i class="fa-solid fa-plus"></i>
                 </button>
-            </form>
-        </div>
+            </div>
+        </section>
 
-        <!-- Main Content Area: Meals & Timeline -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            <!-- Meal Add Form Column -->
-            <div class="lg:col-span-1">
-                <div class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm sticky top-20 space-y-4">
-                    <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-                        <i class="fa-solid fa-square-plus text-emerald-500"></i> Essen eintragen
-                    </h2>
-
-                    <form id="addMealForm" class="space-y-4">
-                        <!-- Meal Category Picker -->
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Kategorie</label>
-                            <div class="grid grid-cols-2 gap-2">
-                                <label class="cursor-pointer">
-                                    <input type="radio" name="mealCategory" value="Morgens" class="peer hidden" checked>
-                                    <div class="p-2.5 text-center rounded-xl border border-slate-200 peer-checked:border-amber-500 peer-checked:bg-amber-50 peer-checked:text-amber-800 text-xs font-semibold text-slate-600 transition flex items-center justify-center gap-1.5">
-                                        <i class="fa-solid fa-sun text-amber-500"></i> Morgens
-                                    </div>
-                                </label>
-                                <label class="cursor-pointer">
-                                    <input type="radio" name="mealCategory" value="Mittags" class="peer hidden">
-                                    <div class="p-2.5 text-center rounded-xl border border-slate-200 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-800 text-xs font-semibold text-slate-600 transition flex items-center justify-center gap-1.5">
-                                        <i class="fa-solid fa-cloud-sun text-orange-500"></i> Mittags
-                                    </div>
-                                </label>
-                                <label class="cursor-pointer">
-                                    <input type="radio" name="mealCategory" value="Abends" class="peer hidden">
-                                    <div class="p-2.5 text-center rounded-xl border border-slate-200 peer-checked:border-indigo-500 peer-checked:bg-indigo-50 peer-checked:text-indigo-800 text-xs font-semibold text-slate-600 transition flex items-center justify-center gap-1.5">
-                                        <i class="fa-solid fa-moon text-indigo-500"></i> Abends
-                                    </div>
-                                </label>
-                                <label class="cursor-pointer">
-                                    <input type="radio" name="mealCategory" value="Snacks" class="peer hidden">
-                                    <div class="p-2.5 text-center rounded-xl border border-slate-200 peer-checked:border-pink-500 peer-checked:bg-pink-50 peer-checked:text-pink-800 text-xs font-semibold text-slate-600 transition flex items-center justify-center gap-1.5">
-                                        <i class="fa-solid fa-cookie-bite text-pink-500"></i> Snacks & Süßes
-                                    </div>
-                                </label>
-                            </div>
-                        </div>
-
-                        <!-- Dish Title -->
-                        <div>
-                            <label for="mealTitle" class="block text-xs font-semibold text-slate-600 mb-1">Gericht / Lebensmittel</label>
-                            <input type="text" id="mealTitle" placeholder="z.B. Haferflocken mit Beeren" required class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition">
-                        </div>
-
-                        <!-- Calories & Time Row -->
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label for="mealCalories" class="block text-xs font-semibold text-slate-600 mb-1">Kalorien (optional)</label>
-                                <div class="relative">
-                                    <input type="number" id="mealCalories" placeholder="z.B. 350" min="0" class="w-full pl-3 pr-11 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition">
-                                    <span class="absolute right-3 top-2.5 text-xs text-slate-400">kcal</span>
-                                </div>
-                            </div>
-                            <div>
-                                <label for="mealTime" class="block text-xs font-semibold text-slate-600 mb-1">Uhrzeit</label>
-                                <input type="time" id="mealTime" required class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition">
-                            </div>
-                        </div>
-
-                        <!-- Notes / Description -->
-                        <div>
-                            <label for="mealNotes" class="block text-xs font-semibold text-slate-600 mb-1">Notizen (optional)</label>
-                            <textarea id="mealNotes" rows="2" placeholder="Besondere Zutaten, Sättigungsgefühl etc." class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition resize-none"></textarea>
-                        </div>
-
-                        <button type="submit" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition shadow-sm flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-plus text-xs"></i> Mahlzeit Speichern
-                        </button>
-                    </form>
-                </div>
+        <!-- SEKTION ESSEN SCHNELLERFASSUNG -->
+        <section class="bg-slate-800 rounded-2xl p-5 shadow-lg border border-slate-700 space-y-4">
+            <div class="flex justify-between items-center">
+                <h2 class="text-lg font-semibold flex items-center gap-2">
+                    <i class="fa-solid fa-bolt text-emerald-400"></i> Essen Schnellerfassung
+                </h2>
+                <button onclick="toggleManageFood()" id="btnManageFood" class="text-xs bg-slate-700 hover:bg-slate-600 px-2.5 py-1 rounded-lg text-slate-300 transition">
+                    Verwalten
+                </button>
             </div>
 
-            <!-- Meal & Drink Logs Column -->
-            <div class="lg:col-span-2 space-y-6">
-                
-                <!-- Daily Logs View -->
-                <div class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-6">
-                    <div class="flex items-center justify-between border-b border-slate-100 pb-4">
-                        <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-                            <i class="fa-solid fa-list-check text-indigo-500"></i> Tagesprotokoll
-                        </h2>
-                        <span id="logDateLabel" class="text-xs font-semibold px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg"></span>
-                    </div>
+            <!-- Kacheln Essen -->
+            <div id="foodTiles" class="grid grid-cols-2 sm:grid-cols-4 gap-2"></div>
 
-                    <!-- Category Sections -->
-                    <div class="space-y-6">
-                        <!-- Morgens -->
-                        <div class="space-y-2">
-                            <div class="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg">
-                                <span class="flex items-center gap-2"><i class="fa-solid fa-sun"></i> Morgens (Frühstück)</span>
-                                <span id="breakfastTotalCal" class="text-[11px] font-medium text-amber-700">0 kcal</span>
-                            </div>
-                            <div id="breakfastList" class="space-y-2 pl-1"></div>
-                        </div>
-
-                        <!-- Mittags -->
-                        <div class="space-y-2">
-                            <div class="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-orange-600 bg-orange-50 px-3 py-1.5 rounded-lg">
-                                <span class="flex items-center gap-2"><i class="fa-solid fa-cloud-sun"></i> Mittags (Mittagessen)</span>
-                                <span id="lunchTotalCal" class="text-[11px] font-medium text-orange-700">0 kcal</span>
-                            </div>
-                            <div id="lunchList" class="space-y-2 pl-1"></div>
-                        </div>
-
-                        <!-- Abends -->
-                        <div class="space-y-2">
-                            <div class="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg">
-                                <span class="flex items-center gap-2"><i class="fa-solid fa-moon"></i> Abends (Abendessen)</span>
-                                <span id="dinnerTotalCal" class="text-[11px] font-medium text-indigo-700">0 kcal</span>
-                            </div>
-                            <div id="dinnerList" class="space-y-2 pl-1"></div>
-                        </div>
-
-                        <!-- Snacks & Süßigkeiten -->
-                        <div class="space-y-2">
-                            <div class="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-pink-600 bg-pink-50 px-3 py-1.5 rounded-lg">
-                                <span class="flex items-center gap-2"><i class="fa-solid fa-cookie-bite"></i> Snacks & Süßigkeiten</span>
-                                <span id="snackTotalCal" class="text-[11px] font-medium text-pink-700">0 kcal</span>
-                            </div>
-                            <div id="snackList" class="space-y-2 pl-1"></div>
-                        </div>
-
-                        <!-- Getränke Log -->
-                        <div class="space-y-2 pt-2 border-t border-slate-100">
-                            <div class="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-sky-600 bg-sky-50 px-3 py-1.5 rounded-lg">
-                                <span class="flex items-center gap-2"><i class="fa-solid fa-glass-water"></i> Getränke des Tages</span>
-                                <span id="fluidsTotalMl" class="text-[11px] font-medium text-sky-700">0 ml</span>
-                            </div>
-                            <div id="fluidList" class="space-y-2 pl-1"></div>
-                        </div>
-                    </div>
-                </div>
-
+            <!-- Neue Essen-Kachel erstellen -->
+            <div class="pt-2 flex gap-2">
+                <input type="text" id="newFoodName" placeholder="Kachel Name (z.B. Apfel)" class="w-1/2 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+                <select id="newFoodCategory" class="w-1/3 bg-slate-900 border border-slate-700 rounded-xl px-2 py-2 text-sm focus:outline-none focus:border-emerald-500">
+                    <option value="morgens">Morgens</option>
+                    <option value="mittags">Mittags</option>
+                    <option value="abends">Abends</option>
+                    <option value="snacks" selected>Snack</option>
+                </select>
+                <button onclick="addCustomFoodTile()" class="w-1/6 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-sm transition flex items-center justify-center">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
             </div>
-        </div>
+        </section>
 
-        <!-- Weekly Trends & Chart Section -->
-        <div class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-4">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
-                <div>
-                    <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-                        <i class="fa-solid fa-chart-line text-sky-500"></i> Wochenverlauf & Statistiken
-                    </h2>
-                    <p class="text-xs text-slate-500">Übersicht über deine Flüssigkeitsaufnahme der letzten 7 Tage</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="inline-flex items-center gap-1 text-xs text-slate-600">
-                        <span class="w-3 h-3 rounded-full bg-sky-500 inline-block"></span> Getrunken
-                    </span>
-                    <span class="inline-flex items-center gap-1 text-xs text-slate-600 ml-3">
-                        <span class="w-3 h-3 rounded-full bg-slate-300 inline-block"></span> Ziel (2500 ml)
-                    </span>
-                </div>
+        <!-- SEKTION ESSEN MANUELL -->
+        <section class="bg-slate-800 rounded-2xl p-5 shadow-lg border border-slate-700 space-y-4">
+            <h2 class="text-lg font-semibold flex items-center gap-2">
+                <i class="fa-solid fa-utensils text-emerald-400"></i> Mahlzeit eintragen
+            </h2>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <button onclick="selectMealType('morgens')" id="btn-morgens" class="meal-type-btn p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-xs font-semibold text-slate-300 hover:border-emerald-500 transition">
+                    <i class="fa-solid fa-sun text-amber-400 block mb-1 text-sm"></i> Morgens
+                </button>
+                <button onclick="selectMealType('mittags')" id="btn-mittags" class="meal-type-btn p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-xs font-semibold text-slate-300 hover:border-emerald-500 transition">
+                    <i class="fa-solid fa-cloud-sun text-orange-400 block mb-1 text-sm"></i> Mittags
+                </button>
+                <button onclick="selectMealType('abends')" id="btn-abends" class="meal-type-btn p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-xs font-semibold text-slate-300 hover:border-emerald-500 transition">
+                    <i class="fa-solid fa-moon text-indigo-400 block mb-1 text-sm"></i> Abends
+                </button>
+                <button onclick="selectMealType('snacks')" id="btn-snacks" class="meal-type-btn p-2.5 rounded-xl border border-slate-700 bg-slate-900 text-xs font-semibold text-slate-300 hover:border-emerald-500 transition">
+                    <i class="fa-solid fa-cookie-bite text-pink-400 block mb-1 text-sm"></i> Snacks
+                </button>
             </div>
-
-            <div class="h-64 w-full relative">
-                <canvas id="weeklyFluidChart"></canvas>
+            <div class="flex gap-2">
+                <input type="text" id="foodDescription" placeholder="Was hast du gegessen?" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500">
+                <button onclick="addFoodLog()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-5 py-2.5 rounded-xl transition text-sm">
+                    Speichern
+                </button>
             </div>
-        </div>
+        </section>
 
+        <!-- TAGELOG / PROTOKOLL -->
+        <section class="bg-slate-800 rounded-2xl p-5 shadow-lg border border-slate-700 space-y-4">
+            <h2 class="text-lg font-semibold">Tagesprotokoll</h2>
+            <div id="logList" class="space-y-2 text-sm">
+                <!-- Dynamische Einträge -->
+            </div>
+        </section>
+
+        <!-- CHART / VERLAUF -->
+        <section class="bg-slate-800 rounded-2xl p-5 shadow-lg border border-slate-700 space-y-4">
+            <h2 class="text-lg font-semibold">Wasserverlauf (Heute)</h2>
+            <div class="w-full h-48">
+                <canvas id="waterChart"></canvas>
+            </div>
+        </section>
     </main>
 
-    <!-- Footer -->
-    <footer class="bg-white border-t border-slate-200 py-4 mt-8">
-        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-400">
-            NutriTrack • Lokales Gesundheitstagebuch • Alle Daten verbleiben lokal im Browser.
-        </div>
-    </footer>
-</div>
-
-<!-- Modal for Goal Editing -->
-<div id="goalModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl space-y-4">
-        <div class="flex justify-between items-center">
-            <h3 class="text-base font-bold text-slate-800">Tagesziel für Flüssigkeit</h3>
-            <button id="closeGoalModal" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Neues Ziel in Millilitern (ml)</label>
-            <input type="number" id="newGoalInput" step="50" min="500" max="10000" class="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
-        </div>
-        <div class="flex gap-2">
-            <button id="saveGoalBtn" class="w-full py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-sm font-semibold transition">Speichern</button>
-        </div>
-    </div>
-</div>
-
-<script>
-// LocalStorage Key Constants
-const STORAGE_KEY_DATA = 'nutritrack_data_v1';
-const STORAGE_KEY_GOAL = 'nutritrack_fluid_goal';
-
-// App State
-let state = {
-    selectedDate: getFormattedDate(new Date()),
-    targetFluid: parseInt(localStorage.getItem(STORAGE_KEY_GOAL)) || 2500,
-    logs: loadStoredData()
-};
-
-let chartInstance = null;
-
-// Initialize App
-document.addEventListener('DOMContentLoaded', () => {
-    initDateControls();
-    initForms();
-    initGoalModal();
-    renderApp();
-});
-
-// Helper: Format Date YYYY-MM-DD
-function getFormattedDate(dateObj) {
-    const year = dateObj.getFullYear();
-    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const day = String(dateObj.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-// Load Data from LocalStorage
-function loadStoredData() {
-    try {
-        const stored = localStorage.getItem(STORAGE_KEY_DATA);
-        return stored ? JSON.parse(stored) : {};
-    } catch (e) {
-        console.error('Error loading data', e);
-        return {};
-    }
-}
-
-// Save Data to LocalStorage
-function saveData() {
-    try {
-        localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(state.logs));
-    } catch (e) {
-        console.error('Error saving data', e);
-    }
-}
-
-// Get or create day entry
-function getDayEntry(dateStr) {
-    if (!state.logs[dateStr]) {
-        state.logs[dateStr] = {
-            meals: [],
-            fluids: []
-        };
-    }
-    return state.logs[dateStr];
-}
-
-// Initialize Date Controls
-function initDateControls() {
-    const dateInput = document.getElementById('selectedDateInput');
-    const prevBtn = document.getElementById('prevDateBtn');
-    const nextBtn = document.getElementById('nextDateBtn');
-    const todayBtn = document.getElementById('todayBtn');
-
-    dateInput.value = state.selectedDate;
-
-    dateInput.addEventListener('change', (e) => {
-        if (e.target.value) {
-            state.selectedDate = e.target.value;
-            renderApp();
-        }
-    });
-
-    prevBtn.addEventListener('click', () => {
-        const current = new Date(state.selectedDate);
-        current.setDate(current.getDate() - 1);
-        state.selectedDate = getFormattedDate(current);
-        dateInput.value = state.selectedDate;
-        renderApp();
-    });
-
-    nextBtn.addEventListener('click', () => {
-        const current = new Date(state.selectedDate);
-        current.setDate(current.getDate() + 1);
-        state.selectedDate = getFormattedDate(current);
-        dateInput.value = state.selectedDate;
-        renderApp();
-    });
-
-    todayBtn.addEventListener('click', () => {
-        state.selectedDate = getFormattedDate(new Date());
-        dateInput.value = state.selectedDate;
-        renderApp();
-    });
-}
-
-// Add Fluid Helper
-function addFluid(name, amount, icon = 'fa-glass-water', color = 'sky') {
-    const day = getDayEntry(state.selectedDate);
-    const now = new Date();
-    const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-
-    day.fluids.push({
-        id: Date.now(),
-        name,
-        amount: parseInt(amount),
-        time: timeStr,
-        icon,
-        color
-    });
-
-    saveData();
-    renderApp();
-}
-
-// Form Initialization
-function initForms() {
-    // Custom Fluid Form
-    const customFluidForm = document.getElementById('customFluidForm');
-    customFluidForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const nameInput = document.getElementById('customFluidName');
-        const amountInput = document.getElementById('customFluidAmount');
-
-        if (nameInput.value && amountInput.value) {
-            addFluid(nameInput.value, amountInput.value, 'fa-glass-water', 'sky');
-            nameInput.value = '';
-            amountInput.value = '';
-        }
-    });
-
-    // Meal Form
-    const addMealForm = document.getElementById('addMealForm');
-    const mealTimeInput = document.getElementById('mealTime');
-    
-    // Set default time to current
-    const now = new Date();
-    mealTimeInput.value = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
-
-    addMealForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const category = document.querySelector('input[name="mealCategory"]:checked').value;
-        const title = document.getElementById('mealTitle').value;
-        const calories = document.getElementById('mealCalories').value;
-        const time = document.getElementById('mealTime').value;
-        const notes = document.getElementById('mealNotes').value;
-
-        const day = getDayEntry(state.selectedDate);
-        day.meals.push({
-            id: Date.now(),
-            category,
-            title,
-            calories: calories ? parseInt(calories) : null,
-            time,
-            notes
-        });
-
-        saveData();
-        renderApp();
-
-        // Reset form
-        document.getElementById('mealTitle').value = '';
-        document.getElementById('mealCalories').value = '';
-        document.getElementById('mealNotes').value = '';
-    });
-}
-
-// Goal Modal Logic
-function initGoalModal() {
-    const modal = document.getElementById('goalModal');
-    const editBtn = document.getElementById('editGoalBtn');
-    const closeBtn = document.getElementById('closeGoalModal');
-    const saveBtn = document.getElementById('saveGoalBtn');
-    const input = document.getElementById('newGoalInput');
-
-    editBtn.addEventListener('click', () => {
-        input.value = state.targetFluid;
-        modal.classList.remove('hidden');
-    });
-
-    closeBtn.addEventListener('click', () => {
-        modal.classList.add('hidden');
-    });
-
-    saveBtn.addEventListener('click', () => {
-        const val = parseInt(input.value);
-        if (val && val >= 500) {
-            state.targetFluid = val;
-            localStorage.setItem(STORAGE_KEY_GOAL, val);
-            modal.classList.add('hidden');
-            renderApp();
-        }
-    });
-}
-
-// Delete Meal or Drink
-function deleteMeal(id) {
-    const day = getDayEntry(state.selectedDate);
-    day.meals = day.meals.filter(m => m.id !== id);
-    saveData();
-    renderApp();
-}
-
-function deleteFluid(id) {
-    const day = getDayEntry(state.selectedDate);
-    day.fluids = day.fluids.filter(f => f.id !== id);
-    saveData();
-    renderApp();
-}
-
-// Core Render Function
-function renderApp() {
-    const day = getDayEntry(state.selectedDate);
-
-    // Render Stats Headers
-    document.getElementById('targetFluid').textContent = state.targetFluid;
-    
-    const totalFluid = day.fluids.reduce((sum, f) => sum + f.amount, 0);
-    document.getElementById('currentFluid').textContent = totalFluid;
-
-    const percent = Math.min(100, Math.round((totalFluid / state.targetFluid) * 100));
-    document.getElementById('fluidPercent').textContent = percent + '%';
-    document.getElementById('fluidProgressBar').style.width = percent + '%';
-
-    // Total Meals and Calories
-    document.getElementById('totalMealsCount').textContent = day.meals.length;
-    const totalCals = day.meals.reduce((sum, m) => sum + (m.calories || 0), 0);
-    document.getElementById('totalCalories').textContent = totalCals;
-
-    // Meal Counts per Category
-    const breakfast = day.meals.filter(m => m.category === 'Morgens');
-    const lunch = day.meals.filter(m => m.category === 'Mittags');
-    const dinner = day.meals.filter(m => m.category === 'Abends');
-    const snacks = day.meals.filter(m => m.category === 'Snacks');
-
-    document.getElementById('breakfastCount').textContent = breakfast.length;
-    document.getElementById('lunchCount').textContent = lunch.length;
-    document.getElementById('dinnerCount').textContent = dinner.length;
-    document.getElementById('snackCount').textContent = snacks.length;
-
-    // Subtotal Calories
-    document.getElementById('breakfastTotalCal').textContent = breakfast.reduce((s, m) => s + (m.calories || 0), 0) + ' kcal';
-    document.getElementById('lunchTotalCal').textContent = lunch.reduce((s, m) => s + (m.calories || 0), 0) + ' kcal';
-    document.getElementById('dinnerTotalCal').textContent = dinner.reduce((s, m) => s + (m.calories || 0), 0) + ' kcal';
-    document.getElementById('snackTotalCal').textContent = snacks.reduce((s, m) => s + (m.calories || 0), 0) + ' kcal';
-    document.getElementById('fluidsTotalMl').textContent = totalFluid + ' ml';
-
-    // Render Formatted Date Label
-    const dateObj = new Date(state.selectedDate);
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    document.getElementById('logDateLabel').textContent = dateObj.toLocaleDateString('de-DE', options);
-
-    // Render Lists
-    renderMealList('breakfastList', breakfast);
-    renderMealList('lunchList', lunch);
-    renderMealList('dinnerList', dinner);
-    renderMealList('snackList', snacks);
-    renderFluidList('fluidList', day.fluids);
-
-    // Render Chart
-    renderChart();
-}
-
-// Render Meal List Category
-function renderMealList(containerId, meals) {
-    const container = document.getElementById(containerId);
-    if (meals.length === 0) {
-        container.innerHTML = `<p class="text-xs text-slate-400 italic py-1">Keine Einträge vorhanden.</p>`;
-        return;
-    }
-
-    container.innerHTML = meals.map(meal => `
-        <div class="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition group">
-            <div class="space-y-0.5">
-                <div class="flex items-center gap-2">
-                    <span class="text-xs font-bold text-slate-700">${escapeHtml(meal.title)}</span>
-                    <span class="text-[10px] px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded-md font-medium">${meal.time} Uhr</span>
-                </div>
-                ${meal.notes ? `<p class="text-xs text-slate-500">${escapeHtml(meal.notes)}</p>` : ''}
-            </div>
-            <div class="flex items-center gap-3">
-                ${meal.calories ? `<span class="text-xs font-semibold text-slate-600 bg-white px-2 py-1 rounded-lg border border-slate-200">${meal.calories} kcal</span>` : ''}
-                <button onclick="deleteMeal(${meal.id})" class="text-slate-300 hover:text-red-500 transition p-1" title="Löschen">
-                    <i class="fa-solid fa-trash-can text-xs"></i>
+    <!-- CONFIG MODAL -->
+    <div id="configModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 rounded-2xl max-w-md w-full p-6 border border-slate-700 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold">Supabase Konfiguration</h3>
+                <button onclick="toggleConfigModal()" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-xl"></i>
                 </button>
             </div>
-        </div>
-    `).join('');
-}
-
-// Render Fluid List
-function renderFluidList(containerId, fluids) {
-    const container = document.getElementById(containerId);
-    if (fluids.length === 0) {
-        container.innerHTML = `<p class="text-xs text-slate-400 italic py-1">Noch keine Getränke erfasst.</p>`;
-        return;
-    }
-
-    container.innerHTML = fluids.map(fluid => `
-        <div class="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-sky-50/30 hover:bg-sky-50/60 transition group">
-            <div class="flex items-center gap-2.5">
-                <div class="w-7 h-7 rounded-lg bg-sky-100 text-sky-600 flex items-center justify-center text-xs">
-                    <i class="fa-solid ${fluid.icon || 'fa-glass-water'}"></i>
+            <p class="text-xs text-slate-400">Trage hier deine Supabase Zugangsdaten aus deinen Projekt-Einstellungen ein.</p>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold mb-1 text-slate-300">Project URL</label>
+                    <input type="text" id="cfgUrl" placeholder="https://xxx.supabase.co" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
                 </div>
                 <div>
-                    <span class="text-xs font-bold text-slate-700 block">${escapeHtml(fluid.name)}</span>
-                    <span class="text-[10px] text-slate-400">${fluid.time} Uhr</span>
+                    <label class="block text-xs font-semibold mb-1 text-slate-300">Anon Key</label>
+                    <input type="password" id="cfgKey" placeholder="eyJhbGci..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
                 </div>
             </div>
-            <div class="flex items-center gap-3">
-                <span class="text-xs font-bold text-sky-700">${fluid.amount} ml</span>
-                <button onclick="deleteFluid(${fluid.id})" class="text-slate-300 hover:text-red-500 transition p-1" title="Löschen">
-                    <i class="fa-solid fa-trash-can text-xs"></i>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="saveConfig()" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl font-semibold text-sm transition">
+                    Speichern & Verbinden
                 </button>
             </div>
         </div>
-    `).join('');
-}
+    </div>
 
-// Helper: Escape HTML to prevent XSS
-function escapeHtml(str) {
-    return str.replace(/[&<>"']/g, function(m) {
-        return {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#039;'
-        }[m];
-    });
-}
+    <script>
+        // Standard-Kacheln Trinken
+        const defaultWaterTiles = [
+            { id: 'w1', name: 'Wasser', amount: 250, icon: 'fa-glass-water' },
+            { id: 'w2', name: 'Wasser Groß', amount: 500, icon: 'fa-bottle-water' },
+            { id: 'w3', name: 'Kaffee', amount: 150, icon: 'fa-mug-hot' },
+            { id: 'w4', name: 'Tee', amount: 200, icon: 'fa-cup-toting' }
+        ];
 
-// Render Weekly Chart
-function renderChart() {
-    const ctx = document.getElementById('weeklyFluidChart').getContext('2d');
+        // Standard-Kacheln Essen
+        const defaultFoodTiles = [
+            { id: 'f1', name: 'Apfel', category: 'snacks' },
+            { id: 'f2', name: 'Banane', category: 'snacks' },
+            { id: 'f3', name: 'Brötchen', category: 'morgens' },
+            { id: 'f4', name: 'Salat', category: 'mittags' },
+            { id: 'f5', name: 'Schokolade', category: 'snacks' },
+            { id: 'f6', name: 'Nüsse', category: 'snacks' }
+        ];
 
-    // Get last 7 days
-    const labels = [];
-    const data = [];
-    const targetData = [];
+        let waterTilesData = JSON.parse(localStorage.getItem('dw_water_tiles')) || defaultWaterTiles;
+        let foodTilesData = JSON.parse(localStorage.getItem('dw_food_tiles')) || defaultFoodTiles;
 
-    const selectedDateObj = new Date(state.selectedDate);
+        let isManageWater = false;
+        let isManageFood = false;
 
-    for (let i = 6; i >= 0; i--) {
-        const d = new Date(selectedDateObj);
-        d.setDate(d.getDate() - i);
-        const dateStr = getFormattedDate(d);
+        let selectedMeal = 'morgens';
+        let supabaseClient = null;
+        let waterChart = null;
 
-        // Day label (e.g. "Mo 05.")
-        const dayLabel = d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
-        labels.push(dayLabel);
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('selectedDate').valueAsDate = new Date();
+            initSupabase();
+            renderWaterTiles();
+            renderFoodTiles();
+            selectMealType('morgens');
+            initChart();
+            loadDayData();
+        });
 
-        const dayEntry = state.logs[dateStr];
-        const dayTotal = dayEntry ? dayEntry.fluids.reduce((sum, f) => sum + f.amount, 0) : 0;
-        data.push(dayTotal);
-        targetData.push(state.targetFluid);
-    }
-
-    if (chartInstance) {
-        chartInstance.destroy();
-    }
-
-    chartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: 'Getrunken (ml)',
-                    data: data,
-                    backgroundColor: '#0ea5e9',
-                    borderRadius: 8,
-                    maxBarThickness: 32
-                },
-                {
-                    label: 'Ziel (ml)',
-                    data: targetData,
-                    type: 'line',
-                    borderColor: '#cbd5e1',
-                    borderWidth: 2,
-                    borderDash: [5, 5],
-                    pointRadius: 0,
-                    fill: false
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return context.dataset.label + ': ' + context.raw + ' ml';
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: {
-                        color: '#f1f5f9'
-                    },
-                    ticks: {
-                        font: { size: 11 }
-                    }
-                },
-                x: {
-                    grid: {
-                        display: false
-                    },
-                    ticks: {
-                        font: { size: 11 }
-                    }
-                }
+        function initSupabase() {
+            const url = localStorage.getItem('dw_supabase_url');
+            const key = localStorage.getItem('dw_supabase_key');
+            
+            if (url && key) {
+                document.getElementById('cfgUrl').value = url;
+                document.getElementById('cfgKey').value = key;
+                supabaseClient = supabase.createClient(url, key);
+            } else {
+                toggleConfigModal();
             }
         }
-    });
-}
-</script>
+
+        function saveConfig() {
+            const url = document.getElementById('cfgUrl').value.trim();
+            const key = document.getElementById('cfgKey').value.trim();
+            
+            if (url && key) {
+                localStorage.setItem('dw_supabase_url', url);
+                localStorage.setItem('dw_supabase_key', key);
+                supabaseClient = supabase.createClient(url, key);
+                toggleConfigModal();
+                loadDayData();
+            }
+        }
+
+        function toggleConfigModal() {
+            document.getElementById('configModal').classList.toggle('hidden');
+        }
+
+        // Datum Navigation
+        function changeDate(days) {
+            const dateInput = document.getElementById('selectedDate');
+            const currentDate = new Date(dateInput.value);
+            currentDate.setDate(currentDate.getDate() + days);
+            dateInput.valueAsDate = currentDate;
+            loadDayData();
+        }
+
+        // KACHELN TRINKEN
+        function renderWaterTiles() {
+            const container = document.getElementById('waterTiles');
+            container.innerHTML = '';
+
+            waterTilesData.forEach(tile => {
+                const div = document.createElement('div');
+                div.className = 'relative group';
+                div.innerHTML = `
+                    <button onclick="logWater('${tile.name}', ${tile.amount})" class="w-full bg-slate-900 border border-slate-700 hover:border-cyan-500 p-2.5 rounded-xl text-center transition flex flex-col items-center">
+                        <i class="fa-solid ${tile.icon || 'fa-glass-water'} text-cyan-400 mb-1"></i>
+                        <span class="text-xs font-semibold">${tile.name}</span>
+                        <span class="text-[10px] text-slate-400">${tile.amount} ml</span>
+                    </button>
+                    ${isManageWater ? `
+                        <button onclick="deleteWaterTile('${tile.id}')" class="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center shadow-md">
+                            &times;
+                        </button>
+                    ` : ''}
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function toggleManageWater() {
+            isManageWater = !isManageWater;
+            document.getElementById('btnManageWater').textContent = isManageWater ? 'Fertig' : 'Verwalten';
+            renderWaterTiles();
+        }
+
+        function deleteWaterTile(id) {
+            waterTilesData = waterTilesData.filter(t => t.id !== id);
+            localStorage.setItem('dw_water_tiles', JSON.stringify(waterTilesData));
+            renderWaterTiles();
+        }
+
+        function addCustomWater() {
+            const type = document.getElementById('customWaterType').value.trim() || 'Wasser';
+            const amount = parseInt(document.getElementById('customWaterAmount').value);
+            if (amount > 0) {
+                logWater(type, amount);
+                document.getElementById('customWaterAmount').value = '';
+            }
+        }
+
+        // KACHELN ESSEN
+        function renderFoodTiles() {
+            const container = document.getElementById('foodTiles');
+            container.innerHTML = '';
+
+            foodTilesData.forEach(tile => {
+                const div = document.createElement('div');
+                div.className = 'relative group';
+                div.innerHTML = `
+                    <button onclick="logFoodQuick('${tile.name}', '${tile.category}')" class="w-full bg-slate-900 border border-slate-700 hover:border-emerald-500 p-2.5 rounded-xl text-center transition flex flex-col items-center">
+                        <i class="fa-solid fa-utensils text-emerald-400 mb-1"></i>
+                        <span class="text-xs font-semibold truncate w-full">${tile.name}</span>
+                        <span class="text-[10px] text-slate-400 capitalize">${tile.category}</span>
+                    </button>
+                    ${isManageFood ? `
+                        <button onclick="deleteFoodTile('${tile.id}')" class="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center shadow-md">
+                            &times;
+                        </button>
+                    ` : ''}
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function toggleManageFood() {
+            isManageFood = !isManageFood;
+            document.getElementById('btnManageFood').textContent = isManageFood ? 'Fertig' : 'Verwalten';
+            renderFoodTiles();
+        }
+
+        function deleteFoodTile(id) {
+            foodTilesData = foodTilesData.filter(t => t.id !== id);
+            localStorage.setItem('dw_food_tiles', JSON.stringify(foodTilesData));
+            renderFoodTiles();
+        }
+
+        function addCustomFoodTile() {
+            const name = document.getElementById('newFoodName').value.trim();
+            const category = document.getElementById('newFoodCategory').value;
+            if (name) {
+                const newTile = {
+                    id: 'f_' + Date.now(),
+                    name: name,
+                    category: category
+                };
+                foodTilesData.push(newTile);
+                localStorage.setItem('dw_food_tiles', JSON.stringify(foodTilesData));
+                document.getElementById('newFoodName').value = '';
+                renderFoodTiles();
+            }
+        }
+
+        // MANUELLE MAHLZEIT WÄHLEN
+        function selectMealType(type) {
+            selectedMeal = type;
+            document.querySelectorAll('.meal-type-btn').forEach(btn => {
+                btn.classList.remove('border-emerald-500', 'bg-slate-800');
+                btn.classList.add('bg-slate-900');
+            });
+            const activeBtn = document.getElementById(`btn-${type}`);
+            if (activeBtn) {
+                activeBtn.classList.add('border-emerald-500', 'bg-slate-800');
+            }
+        }
+
+        // SUPABASE LOGGING
+        async function logWater(type, amount) {
+            if (!supabaseClient) return alert('Bitte zuerst Supabase konfigurieren!');
+            const selectedDate = document.getElementById('selectedDate').value;
+            const now = new Date();
+            const timestamp = new Date(selectedDate + 'T' + now.toTimeString().split(' ')[0]);
+
+            const { error } = await supabaseClient
+                .from('water_logs')
+                .insert([{ created_at: timestamp.toISOString(), type: type, amount_ml: amount }]);
+
+            if (!error) loadDayData();
+        }
+
+        async function logFoodQuick(name, category) {
+            if (!supabaseClient) return alert('Bitte zuerst Supabase konfigurieren!');
+            const selectedDate = document.getElementById('selectedDate').value;
+            const now = new Date();
+            const timestamp = new Date(selectedDate + 'T' + now.toTimeString().split(' ')[0]);
+
+            const { error } = await supabaseClient
+                .from('food_logs')
+                .insert([{ created_at: timestamp.toISOString(), meal_type: category, description: name }]);
+
+            if (!error) loadDayData();
+        }
+
+        async function addFoodLog() {
+            if (!supabaseClient) return alert('Bitte zuerst Supabase konfigurieren!');
+            const desc = document.getElementById('foodDescription').value.trim();
+            if (!desc) return;
+
+            const selectedDate = document.getElementById('selectedDate').value;
+            const now = new Date();
+            const timestamp = new Date(selectedDate + 'T' + now.toTimeString().split(' ')[0]);
+
+            const { error } = await supabaseClient
+                .from('food_logs')
+                .insert([{ created_at: timestamp.toISOString(), meal_type: selectedMeal, description: desc }]);
+
+            if (!error) {
+                document.getElementById('foodDescription').value = '';
+                loadDayData();
+            }
+        }
+
+        async function deleteLog(table, id) {
+            if (!supabaseClient) return;
+            const { error } = await supabaseClient.from(table).delete().eq('id', id);
+            if (!error) loadDayData();
+        }
+
+        // DATEN LADEN
+        async function loadDayData() {
+            if (!supabaseClient) return;
+            
+            const selectedDate = document.getElementById('selectedDate').value;
+            const startOfDay = new Date(selectedDate + 'T00:00:00').toISOString();
+            const endOfDay = new Date(selectedDate + 'T23:59:59').toISOString();
+
+            // Water Logs
+            const { data: waterLogs } = await supabaseClient
+                .from('water_logs')
+                .select('*')
+                .gte('created_at', startOfDay)
+                .lte('created_at', endOfDay)
+                .order('created_at', { ascending: true });
+
+            // Food Logs
+            const { data: foodLogs } = await supabaseClient
+                .from('food_logs')
+                .select('*')
+                .gte('created_at', startOfDay)
+                .lte('created_at', endOfDay)
+                .order('created_at', { ascending: true });
+
+            updateUI(waterLogs || [], foodLogs || []);
+        }
+
+        function updateUI(waterLogs, foodLogs) {
+            // Stats
+            const totalMl = waterLogs.reduce((sum, item) => sum + item.amount_ml, 0);
+            document.getElementById('totalWater').textContent = totalMl;
+            document.getElementById('totalMeals').textContent = foodLogs.length;
+
+            // Log-Liste
+            const logList = document.getElementById('logList');
+            logList.innerHTML = '';
+
+            const combined = [
+                ...waterLogs.map(w => ({ ...w, _type: 'water' })),
+                ...foodLogs.map(f => ({ ...f, _type: 'food' }))
+            ].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+            if (combined.length === 0) {
+                logList.innerHTML = '<div class="text-slate-500 text-center py-4">Noch keine Einträge für diesen Tag.</div>';
+            } else {
+                combined.forEach(item => {
+                    const time = new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const div = document.createElement('div');
+                    div.className = 'flex items-center justify-between bg-slate-900 p-3 rounded-xl border border-slate-700/50';
+
+                    if (item._type === 'water') {
+                        div.innerHTML = `
+                            <div class="flex items-center gap-3">
+                                <i class="fa-solid fa-droplet text-cyan-400"></i>
+                                <div>
+                                    <div class="font-semibold text-slate-200">${item.type} (${item.amount_ml} ml)</div>
+                                    <div class="text-[10px] text-slate-500">${time}</div>
+                                </div>
+                            </div>
+                            <button onclick="deleteLog('water_logs', ${item.id})" class="text-slate-500 hover:text-red-400 p-1">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
+                        `;
+                    } else {
+                        div.innerHTML = `
+                            <div class="flex items-center gap-3">
+                                <i class="fa-solid fa-utensils text-emerald-400"></i>
+                                <div>
+                                    <div class="font-semibold text-slate-200">${item.description}</div>
+                                    <div class="text-[10px] text-slate-500 capitalize">${item.meal_type} • ${time}</div>
+                                </div>
+                            </div>
+                            <button onclick="deleteLog('food_logs', ${item.id})" class="text-slate-500 hover:text-red-400 p-1">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
+                        `;
+                    }
+                    logList.appendChild(div);
+                });
+            }
+
+            updateChart(waterLogs);
+        }
+
+        // CHART JS
+        function initChart() {
+            const ctx = document.getElementById('waterChart').getContext('2d');
+            waterChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Wasserverlauf (ml)',
+                        data: [],
+                        borderColor: '#22d3ee',
+                        backgroundColor: 'rgba(34, 211, 238, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }
+                    }
+                }
+            });
+        }
+
+        function updateChart(waterLogs) {
+            if (!waterChart) return;
+            
+            let accum = 0;
+            const labels = [];
+            const data = [];
+
+            waterLogs.forEach(log => {
+                const time = new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                accum += log.amount_ml;
+                labels.push(time);
+                data.push(accum);
+            });
+
+            waterChart.data.labels = labels;
+            waterChart.data.datasets[0].data = data;
+            waterChart.update();
+        }
+    </script>
 </body>
 </html>
