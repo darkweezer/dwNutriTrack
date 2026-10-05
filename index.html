@@ -124,6 +124,10 @@ body{background:#f8fafc;font-family:Inter,system-ui,-apple-system,"Segoe UI",san
   </div>
   <div class="h-64 relative"><canvas id="chartKcal"></canvas></div>
  </section>
+ <section class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-3">
+  <div class="border-b border-slate-100 pb-3"><h2 class="font-bold text-lg">☕ Kaffee Wochenverlauf</h2><p class="text-xs text-slate-500">Kaffee der letzten 7 Tage nach Tageszeit · <span id="cAvg">Ø –</span></p></div>
+  <div class="h-64 relative"><canvas id="chartCoffee"></canvas></div>
+ </section>
  <section class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
   <div><h2 class="font-bold text-lg">💾 Daten sichern</h2><p class="text-xs text-slate-500">Alle Einträge, Ziele und Schnellerfassungen als JSON-Datei speichern oder wiederherstellen.</p></div>
   <div class="flex gap-2"><button id="expBtn" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-sm font-semibold">⬇️ Exportieren</button>
@@ -236,7 +240,7 @@ function renderQuick(){
  $('quick').innerHTML=QUICK.length?QUICK.map((q,i)=>tile(q,i,'q','sky',q[1]+' ml',editQ)).join(''):empty;
  $('quickFood').innerHTML=FOOD.length?FOOD.map((f,i)=>tile(f,i,'f','emerald',(f[1]!=null?'ca. '+f[1]+' kcal':'–')+(f[3]?' · '+f[3]:''),editF)).join(''):empty;
 }
-let goal=parseInt(store.get('nutritrack_fluid_goal'))||2500, sel=fmt(new Date()), chart=null,chartK=null,kGoal=parseInt(store.get('nutritrack_kcal_goal'))||null;
+let goal=parseInt(store.get('nutritrack_fluid_goal'))||2500, sel=fmt(new Date()), chart=null,chartK=null,chartC=null,kGoal=parseInt(store.get('nutritrack_kcal_goal'))||null;
 
 function fmt(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function parse(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)}
@@ -443,15 +447,18 @@ function render(){
 
 const FB=[{k:'Morgens',c:'#7dd3fc'},{k:'Mittags',c:'#0ea5e9'},{k:'Abends',c:'#0369a1'}];
 const KC={Morgens:'#fbbf24',Mittags:'#fb923c',Abends:'#6366f1',Snacks:'#ec4899'};
+const CB=[{k:'Morgens',c:'#d6a46c'},{k:'Mittags',c:'#a0642d'},{k:'Abends',c:'#5c3a1a'}];
+function isCoffee(f){return ico(f.icon)==='☕'||/kaffee|coffee|espresso|cappuccino|latte|macchiato|americano|mokka/i.test(f.name||'')}
 function fBucket(t){const h=parseInt((t||'12').slice(0,2));return h<10?'Morgens':h<15?'Mittags':'Abends'}
 function drawChart(){
- const labels=[],t=[],k=[],fb={Morgens:[],Mittags:[],Abends:[]},kb={Morgens:[],Mittags:[],Abends:[],Snacks:[]};
+ const labels=[],t=[],k=[],cups=[],cb={Morgens:[],Mittags:[],Abends:[]},fb={Morgens:[],Mittags:[],Abends:[]},kb={Morgens:[],Mittags:[],Abends:[],Snacks:[]};
  for(let i=6;i>=0;i--){const x=parse(sel);x.setDate(x.getDate()-i);
   labels.push(x.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}));
   const e=logs[fmt(x)],F=e?e.fluids:[],M=e?e.meals:[];
   FB.forEach(b=>fb[b.k].push(F.filter(f=>fBucket(f.time)===b.k).reduce((s,f)=>s+f.amount,0)));
   CATS.forEach(c=>kb[c.k].push(M.filter(m=>m.category===c.k).reduce((s,m)=>s+(m.calories||0),0)));
-  t.push(goal);k.push(M.reduce((s,m)=>s+(m.calories||0),0))}
+  t.push(goal);k.push(M.reduce((s,m)=>s+(m.calories||0),0));
+  const C=F.filter(isCoffee);cups.push(C.length);CB.forEach(b=>cb[b.k].push(C.filter(f=>fBucket(f.time)===b.k).reduce((s,f)=>s+f.amount,0)))}
  if(chart)chart.destroy();
  const opt=u=>({responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{boxWidth:12,filter:i=>!i.text.startsWith('Ziel')}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.raw+' '+u,footer:it=>'Summe: '+it.filter(i=>i.dataset.type!=='line').reduce((a,i)=>a+i.raw,0)+' '+u}}},scales:{y:{stacked:true,beginAtZero:true,grid:{color:'#f1f5f9'}},x:{stacked:true,grid:{display:false}}}});
  const goalLine=(l,v)=>({label:l,data:v,type:'line',borderColor:'#94a3b8',borderWidth:2,borderDash:[5,5],pointRadius:0,stack:'goal'});
@@ -460,6 +467,11 @@ function drawChart(){
  $('kAvg').textContent=used.length?'Ø '+Math.round(used.reduce((a,b)=>a+b,0)/used.length)+' kcal an Tagen mit Einträgen':'Ø –';
  if(chartK)chartK.destroy();
  chartK=new Chart($('chartKcal').getContext('2d'),{type:'bar',data:{labels,datasets:[...CATS.map(c=>({label:c.k,data:kb[c.k],backgroundColor:KC[c.k],maxBarThickness:32})),...(kGoal?[goalLine('Ziel (kcal)',k.map(()=>kGoal))]:[])]},options:opt('kcal')});
+ const cSum=cups.reduce((a,b)=>a+b,0),cMl=CB.reduce((s,b)=>s+cb[b.k].reduce((a,v)=>a+v,0),0);
+ $('cAvg').textContent=cSum?'Ø '+(cSum/7).toLocaleString('de-DE',{maximumFractionDigits:1})+' Tassen pro Tag · '+cSum+' Tassen / '+cMl+' ml in 7 Tagen':'Ø –';
+ const oc=opt('ml');oc.plugins.tooltip.callbacks.footer=it=>'Summe: '+it.reduce((a,i)=>a+i.raw,0)+' ml · '+cups[it[0].dataIndex]+(cups[it[0].dataIndex]===1?' Tasse':' Tassen');
+ if(chartC)chartC.destroy();
+ chartC=new Chart($('chartCoffee').getContext('2d'),{type:'bar',data:{labels,datasets:CB.map(b=>({label:b.k,data:cb[b.k],backgroundColor:b.c,maxBarThickness:32}))},options:oc});
 }
 init();render();
 </script>

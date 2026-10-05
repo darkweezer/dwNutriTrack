@@ -12,7 +12,7 @@ Repo: https://github.com/darkweezer/dwNutriTrack (Branch `main`), Pages: https:/
 
 ## Funktionen (Stand 10/2026)
 Datumsnavigation, Flüssigkeit/Mahlzeiten/Energie-Karten mit Zielen, Schnellerfassung Trinken/Essen (bearbeitbar, Uhrzeit-Dialog, `autoCat`),
-Tagesprotokoll mit Bearbeiten/Löschen, zwei gestapelte Wochenverläufe, JSON-Export/Import (zusammenführen/ersetzen), Supabase-Sync mit Login (☁️).
+Tagesprotokoll mit Bearbeiten/Löschen, drei gestapelte Wochenverläufe (Trinken, Kalorien, Kaffee – Kaffee erkannt per ☕-Icon oder Name via `isCoffee`), JSON-Export/Import (zusammenführen/ersetzen), Supabase-Sync mit Login (☁️).
 
 ## Daten (localStorage)
 - `nutritrack_data_v1`: `{ "YYYY-MM-DD": { meals:[{id,category,title,calories,time,notes,sid?,dirty?}], fluids:[{id,name,amount,time,icon,sid?,dirty?}] } }`
