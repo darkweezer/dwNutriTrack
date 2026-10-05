@@ -15,7 +15,7 @@ body{background:#f8fafc;font-family:Inter,system-ui,-apple-system,"Segoe UI",san
 </head>
 <body class="antialiased">
 <header class="bg-white border-b border-slate-200 sticky top-0 z-30" style="top:env(safe-area-inset-top,0px)">
- <div class="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
+ <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
   <div class="flex items-center gap-3">
    <div class="bg-gradient-to-tr from-sky-500 to-indigo-600 w-10 h-10 rounded-xl flex items-center justify-center text-xl">🍽️</div>
    <div><h1 class="font-bold leading-tight">NutriTrack</h1><p class="text-xs text-slate-500">Dein Ess- & Trink-Tagebuch</p></div>
@@ -31,7 +31,7 @@ body{background:#f8fafc;font-family:Inter,system-ui,-apple-system,"Segoe UI",san
  </div>
 </header>
 
-<main class="max-w-5xl mx-auto px-4 py-6 space-y-6">
+<main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
  <div class="grid md:grid-cols-3 gap-4">
   <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
    <div class="flex justify-between"><span class="text-xs font-bold uppercase text-sky-600 bg-sky-50 px-2.5 py-1 rounded-full">Flüssigkeit</span>
@@ -85,7 +85,7 @@ body{background:#f8fafc;font-family:Inter,system-ui,-apple-system,"Segoe UI",san
   </div></form>
  </section>
 
- <div class="grid lg:grid-cols-3 gap-6">
+ <div class="grid lg:grid-cols-3 xl:grid-cols-4 gap-6">
   <section class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-4 self-start">
    <h2 class="font-bold text-lg">➕ Essen eintragen</h2>
    <form id="mealForm" class="space-y-3">
@@ -100,7 +100,7 @@ body{background:#f8fafc;font-family:Inter,system-ui,-apple-system,"Segoe UI",san
    </form>
   </section>
 
-  <div class="lg:col-span-2 grid md:grid-cols-2 gap-6 items-start">
+  <div class="lg:col-span-2 xl:col-span-3 grid xl:grid-cols-2 gap-6 items-start">
    <section class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-5">
     <div class="flex items-center justify-between flex-wrap gap-2 border-b border-slate-100 pb-3">
      <h2 class="font-bold text-lg">🍽️ Essensprotokoll</h2><span id="dlabel" class="text-xs font-semibold px-2.5 py-1 bg-slate-100 rounded-lg"></span>
