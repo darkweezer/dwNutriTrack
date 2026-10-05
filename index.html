@@ -6,6 +6,7 @@
 <title>NutriTrack – Ernährungs- & Trink-Tagebuch</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
@@ -19,12 +20,14 @@ body{background:#f8fafc;font-family:Inter,system-ui,-apple-system,"Segoe UI",san
    <div class="bg-gradient-to-tr from-sky-500 to-indigo-600 w-10 h-10 rounded-xl flex items-center justify-center text-xl">🍽️</div>
    <div><h1 class="font-bold leading-tight">NutriTrack</h1><p class="text-xs text-slate-500">Dein Ess- & Trink-Tagebuch</p></div>
   </div>
+  <div class="flex items-center gap-2">
+  <button id="sbBtn" title="Cloud-Sync (Supabase)" class="relative w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200">☁️<span id="sbDot" class="absolute top-1 right-1 w-2 h-2 rounded-full bg-slate-300"></span></button>
   <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
    <button id="prev" class="px-2 py-1 rounded-lg hover:bg-white">‹</button>
    <input type="date" id="date" class="bg-transparent text-sm font-semibold text-center w-32">
    <button id="next" class="px-2 py-1 rounded-lg hover:bg-white">›</button>
    <button id="today" class="hidden sm:block text-xs font-semibold px-2 py-1 bg-white text-sky-600 rounded-lg">Heute</button>
-  </div>
+  </div></div>
  </div>
 </header>
 
@@ -107,9 +110,8 @@ body{background:#f8fafc;font-family:Inter,system-ui,-apple-system,"Segoe UI",san
 
  <section class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-3">
   <div class="flex justify-between flex-wrap gap-2 border-b border-slate-100 pb-3">
-   <div><h2 class="font-bold text-lg">📈 Wochenverlauf</h2><p class="text-xs text-slate-500">Flüssigkeitsaufnahme der letzten 7 Tage</p></div>
+   <div><h2 class="font-bold text-lg">📈 Wochenverlauf</h2><p class="text-xs text-slate-500">Flüssigkeitsaufnahme der letzten 7 Tage nach Tageszeit</p></div>
    <div class="text-xs text-slate-600 flex items-center gap-3">
-    <span><span class="inline-block w-3 h-3 rounded-full bg-sky-500"></span> Getrunken</span>
     <span><span class="inline-block w-3 h-3 rounded-full bg-slate-300"></span> Ziel (<span id="legTgt">2500</span> ml)</span>
    </div>
   </div>
@@ -117,10 +119,16 @@ body{background:#f8fafc;font-family:Inter,system-ui,-apple-system,"Segoe UI",san
  </section>
 <section class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-3">
   <div class="flex justify-between flex-wrap gap-2 border-b border-slate-100 pb-3">
-   <div><h2 class="font-bold text-lg">🔥 Kalorien Wochenverlauf</h2><p class="text-xs text-slate-500">Geschätzte Energie der letzten 7 Tage · <span id="kAvg">Ø –</span></p></div>
-   <div class="text-xs text-slate-600"><span class="inline-block w-3 h-3 rounded-full bg-amber-500"></span> kcal pro Tag <span id="kLeg" class="hidden ml-3"><span class="inline-block w-3 h-3 rounded-full bg-slate-300"></span> Ziel (<span id="kLegV"></span> kcal)</span></div>
+   <div><h2 class="font-bold text-lg">🔥 Kalorien Wochenverlauf</h2><p class="text-xs text-slate-500">Geschätzte Energie der letzten 7 Tage nach Mahlzeit · <span id="kAvg">Ø –</span></p></div>
+   <div class="text-xs text-slate-600"><span id="kLeg" class="hidden ml-3"><span class="inline-block w-3 h-3 rounded-full bg-slate-300"></span> Ziel (<span id="kLegV"></span> kcal)</span></div>
   </div>
   <div class="h-64 relative"><canvas id="chartKcal"></canvas></div>
+ </section>
+ <section class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+  <div><h2 class="font-bold text-lg">💾 Daten sichern</h2><p class="text-xs text-slate-500">Alle Einträge, Ziele und Schnellerfassungen als JSON-Datei speichern oder wiederherstellen.</p></div>
+  <div class="flex gap-2"><button id="expBtn" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-sm font-semibold">⬇️ Exportieren</button>
+   <button id="impBtn" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-semibold">⬆️ Importieren</button>
+   <input id="impFile" type="file" accept=".json,application/json" class="hidden"></div>
  </section>
 </main>
 
@@ -161,6 +169,42 @@ body{background:#f8fafc;font-family:Inter,system-ui,-apple-system,"Segoe UI",san
  </form>
 </div>
 
+<div id="sbModal" class="fixed inset-0 bg-slate-900/40 z-50 hidden items-center justify-center p-4">
+ <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 max-h-full overflow-y-auto">
+  <div class="flex justify-between"><h3 class="font-bold">☁️ Cloud-Sync (Supabase)</h3><button id="sbClose">✕</button></div>
+  <p id="sbStatus" class="text-sm px-3 py-2 rounded-xl bg-slate-100 text-slate-600">Nicht verbunden.</p>
+  <div id="sbCfg" class="space-y-2">
+   <label class="block text-xs font-semibold text-slate-600">Projekt-URL</label>
+   <input id="sbUrl" type="url" placeholder="https://xxxx.supabase.co" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl">
+   <label class="block text-xs font-semibold text-slate-600">anon / public key</label>
+   <input id="sbKey" placeholder="eyJ…" autocomplete="off" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl font-mono">
+   <p class="text-[11px] text-slate-500">Zu finden unter Project Settings → API. Niemals den service_role key eintragen.</p>
+  </div>
+  <form id="sbLogin" class="space-y-2 pt-2 border-t border-slate-100">
+   <input id="sbMail" type="email" required placeholder="E-Mail" autocomplete="username" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl">
+   <input id="sbPw" type="password" required placeholder="Passwort" autocomplete="current-password" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl">
+   <button class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold">Speichern & anmelden</button>
+  </form>
+  <div id="sbIn" class="hidden space-y-2 pt-2 border-t border-slate-100">
+   <button id="sbNow" class="w-full py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-sm font-semibold">🔄 Jetzt synchronisieren</button>
+   <button id="sbOut" class="w-full py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-semibold">Abmelden</button>
+   <button id="sbForget" class="w-full py-2 text-xs text-red-500 hover:text-red-700">Verbindung entfernen</button>
+  </div>
+  <p class="text-[11px] text-slate-500">Das Passwort wird nicht gespeichert. Supabase merkt sich nur die Anmeldesitzung in diesem Browser.</p>
+ </div>
+</div>
+
+<div id="ioModal" class="fixed inset-0 bg-slate-900/40 z-50 hidden items-center justify-center p-4">
+ <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4">
+  <div class="flex justify-between"><h3 class="font-bold">Daten importieren</h3><button id="ioClose">✕</button></div>
+  <p id="ioInfo" class="text-sm text-slate-600"></p>
+  <label class="flex items-center gap-2 text-sm"><input id="ioSet" type="checkbox" checked> Ziele & Schnellerfassung übernehmen</label>
+  <div class="space-y-2"><button id="ioMerge" class="w-full py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-sm font-semibold">Zusammenführen</button>
+   <button id="ioReplace" class="w-full py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-sm font-semibold">Alles ersetzen</button></div>
+  <p class="text-xs text-slate-500">Zusammenführen ergänzt fehlende Einträge, vorhandene bleiben erhalten. Ersetzen löscht alle bisherigen Tagebuchdaten in diesem Browser.</p>
+ </div>
+</div>
+
 <div id="modal" class="fixed inset-0 bg-slate-900/40 z-50 hidden items-center justify-center p-4">
  <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4">
   <div class="flex justify-between"><h3 class="font-bold">Tagesziel Flüssigkeit</h3><button id="mClose">✕</button></div>
@@ -198,7 +242,7 @@ function fmt(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'
 function parse(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)}
 function nowT(){const n=new Date();return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')}
 function day(s){return logs[s]||(logs[s]={meals:[],fluids:[]})}
-function save(){store.set('nutritrack_data_v1',JSON.stringify(logs))}
+function save(sync=true){store.set('nutritrack_data_v1',JSON.stringify(logs));if(sync&&typeof sbSchedule==='function')sbSchedule()}
 function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
 function shift(n){const d=parse(sel);d.setDate(d.getDate()+n);setDate(fmt(d))}
 function setDate(s){sel=s;$('date').value=s;$('mTime').value=nowT();render()}
@@ -212,6 +256,8 @@ function askTime(label,fn,cat){pendingAdd=fn;$('tLabel').textContent=label;$('tT
  $('timeModal').classList.replace('hidden','flex');$('tTime').focus()}
 function closeTime(){$('timeModal').classList.replace('flex','hidden');pendingAdd=null}
 let editing=null;
+const FA={'fa-glass-water':'🥛','fa-bottle-water':'🍼','fa-mug-hot':'☕','fa-mug-saucer':'☕','fa-leaf':'🍵','fa-whiskey-glass':'🥤'};
+function ico(i){return !i?'🥛':/^fa-/.test(i)?(FA[i]||'🥛'):i}
 function findItem(t,id){const d=day(sel);return (t==='meal'?d.meals:d.fluids).find(x=>x.id===id)}
 function openEdit(t,id){const it=findItem(t,id);if(!it)return;editing={t,id};
  $('eName').value=t==='meal'?it.title:it.name;
@@ -223,11 +269,116 @@ function openEdit(t,id){const it=findItem(t,id);if(!it)return;editing={t,id};
  if(t==='meal'){$('eCat').value=it.category;$('eNotes').value=it.notes||''}
  $('editModal').classList.replace('hidden','flex')}
 function closeEdit(){$('editModal').classList.replace('flex','hidden');editing=null}
-function delMeal(id){const d=day(sel);d.meals=d.meals.filter(m=>m.id!==id);save();render()}
-function delFluid(id){const d=day(sel);d.fluids=d.fluids.filter(f=>f.id!==id);save();render()}
+function delMeal(id){const d=day(sel);d.meals.filter(m=>m.id===id&&m.sid!=null).forEach(m=>sbQueueDel('meal',m.sid));d.meals=d.meals.filter(m=>m.id!==id);save();render()}
+function delFluid(id){const d=day(sel);d.fluids.filter(f=>f.id===id&&f.sid!=null).forEach(f=>sbQueueDel('fluid',f.sid));d.fluids=d.fluids.filter(f=>f.id!==id);save();render()}
+
+function exportData(){
+ const out={app:'NutriTrack',version:1,exported:new Date().toISOString(),data:logs,fluidGoal:goal,kcalGoal:kGoal,quickDrinks:QUICK,quickFood:FOOD};
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(out,null,1)],{type:'application/json'}));
+ a.download='nutritrack-backup-'+fmt(new Date())+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+let pendingImp=null;
+function cleanData(d){const r={};if(!d||typeof d!=='object'||Array.isArray(d))return null;
+ for(const [k,v] of Object.entries(d)){if(!/^\d{4}-\d{2}-\d{2}$/.test(k)||!v||typeof v!=='object')continue;
+  r[k]={meals:(Array.isArray(v.meals)?v.meals:[]).filter(m=>m&&m.title!=null).map(m=>({id:m.id??Date.now()+Math.random(),category:CATS.some(c=>c.k===m.category)?m.category:autoCat(m.time),title:String(m.title),calories:m.calories==null||m.calories===''?null:parseInt(m.calories)||0,time:m.time||'12:00',notes:m.notes||'',...(m.sid!=null?{sid:m.sid,dirty:true}:{})})),
+   fluids:(Array.isArray(v.fluids)?v.fluids:[]).filter(f=>f&&f.name!=null&&parseInt(f.amount)>0).map(f=>({id:f.id??Date.now()+Math.random(),name:String(f.name),amount:parseInt(f.amount),time:f.time||'12:00',icon:f.icon||'🥛',...(f.sid!=null?{sid:f.sid,dirty:true}:{})}))}}
+ return r}
+function readImport(file){const fr=new FileReader();fr.onload=()=>{let j;try{j=JSON.parse(fr.result)}catch(e){return alert('Die Datei ist kein gültiges JSON.')}
+ const data=cleanData(j&&j.data?j.data:j);if(!data)return alert('Die Datei enthält keine NutriTrack-Daten.');
+ const days=Object.keys(data).length,n=Object.values(data).reduce((s,d)=>s+d.meals.length+d.fluids.length,0);
+ if(!days)return alert('In der Datei wurden keine Tagebucheinträge gefunden.');
+ pendingImp={data,j};const ks=Object.keys(data).sort();
+ $('ioInfo').textContent=`${n} ${n===1?'Eintrag':'Einträge'} an ${days} ${days===1?'Tag':'Tagen'} (${parse(ks[0]).toLocaleDateString('de-DE')} – ${parse(ks[ks.length-1]).toLocaleDateString('de-DE')})`+(j.exported?`, exportiert am ${new Date(j.exported).toLocaleDateString('de-DE')}`:'')+'.';
+ $('ioSet').parentElement.classList.toggle('hidden',!j.data);
+ $('ioModal').classList.replace('hidden','flex')};fr.readAsText(file)}
+function applyImport(replace){if(!pendingImp)return;const {data,j}=pendingImp;
+ if(replace){if(!confirm('Wirklich alle bisherigen Einträge durch die Datei ersetzen?'))return;logs=data}
+ else for(const [k,v] of Object.entries(data)){const d=day(k);
+  ['meals','fluids'].forEach(t=>{const ids=new Set(d[t].map(x=>x.id));v[t].forEach(x=>{if(!ids.has(x.id))d[t].push(x)})})}
+ if(j.data&&$('ioSet').checked){
+  if(parseInt(j.fluidGoal)>=500){goal=parseInt(j.fluidGoal);store.set('nutritrack_fluid_goal',goal)}
+  if('kcalGoal' in j){kGoal=parseInt(j.kcalGoal)||null;store.set('nutritrack_kcal_goal',kGoal||'')}
+  if(Array.isArray(j.quickDrinks))QUICK=j.quickDrinks.filter(Array.isArray);if(Array.isArray(j.quickFood))FOOD=j.quickFood.filter(Array.isArray);saveLists();renderQuick()}
+ save();closeImp();render();alert('Import abgeschlossen.')}
+function closeImp(){$('ioModal').classList.replace('flex','hidden');pendingImp=null;$('impFile').value=''}
+
+// --- Supabase: Konfiguration & Login (Sync folgt nach Tabellen-Zuordnung) ---
+let sb=null,sbUser=null,sbKeyCur='';
+function sbCfg(){try{return JSON.parse(store.get('nutritrack_supabase'))||{}}catch(e){return {}}}
+function sbConnect(c){if(!c.url||!c.key)return sb=null;if(sb&&sbKeyCur===c.url+c.key)return sb;
+ if(!window.supabase){sbUI('Supabase-Bibliothek konnte nicht geladen werden (offline?).');return sb=null}
+ try{sb=supabase.createClient(c.url,c.key,{auth:{storageKey:'nutritrack_sb_auth',persistSession:true,autoRefreshToken:true}});sbKeyCur=c.url+c.key;
+  sb.auth.onAuthStateChange((ev,s)=>{sbUser=s?s.user:null;sbUI();if(ev==='SIGNED_IN'&&sbUser)setTimeout(sbSync,0)})}catch(e){sb=null;sbUI('Verbindung fehlgeschlagen: '+e.message)}
+ return sb}
+function sbUI(err){const st=$('sbStatus'),on=!!sbUser,cfg=!!sb;err=err||(on?sbErr:null);
+ $('sbDot').className='absolute top-1 right-1 w-2 h-2 rounded-full '+(err?'bg-red-500':sbBusy?'bg-sky-500 animate-pulse':on?'bg-emerald-500':cfg?'bg-amber-400':'bg-slate-300');
+ st.className='text-sm px-3 py-2 rounded-xl '+(err?'bg-red-50 text-red-600':on?'bg-emerald-50 text-emerald-700':'bg-slate-100 text-slate-600');
+ st.textContent=err||(on?'Angemeldet als '+sbUser.email+(sbBusy?' · synchronisiere …':sbLast?' · synchronisiert '+sbLast.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' Uhr':'')+(sbExtChecked&&!(sbExt.meal&&sbExt.fluid)?' · Hinweis: Kalorien/Notizen/Icons werden nicht in Supabase gespeichert (Spalten fehlen).':''):cfg?'Verbindung gespeichert, nicht angemeldet.':'Nicht verbunden.');
+ $('sbLogin').classList.toggle('hidden',on);$('sbIn').classList.toggle('hidden',!on);
+ $('sbUrl').disabled=$('sbKey').disabled=on}
+// --- Sync: food_logs / water_logs ---
+const SB_T={meal:'food_logs',fluid:'water_logs'},SB_K={meal:'meals',fluid:'fluids'};
+let sbExt={meal:false,fluid:false},sbExtChecked=false,sbBusy=false,sbAgain=false,sbTimer=null,sbLast=null,sbErr=null;
+let sbDelQ=[];try{sbDelQ=JSON.parse(store.get('nutritrack_sb_deletes'))||[]}catch(e){}
+function sbDelSave(){store.set('nutritrack_sb_deletes',JSON.stringify(sbDelQ))}
+function sbQueueDel(t,sid){sbDelQ.push([t,sid]);sbDelSave()}
+function toTs(date,time){const [y,m,d]=date.split('-').map(Number),[h,mi]=(time||'12:00').split(':').map(Number);return new Date(y,m-1,d,h||0,mi||0).toISOString()}
+function fromTs(ts){const d=new Date(ts);return [fmt(d),String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')]}
+function mapCat(v,t){const s=(v||'').toLowerCase();return /morg|früh|frueh|break/.test(s)?'Morgens':/mittag|lunch/.test(s)?'Mittags':/abend|dinner|supper/.test(s)?'Abends':/snack|süß|sweet/.test(s)?'Snacks':autoCat(t)}
+function toRow(t,it,date){const r={created_at:toTs(date,it.time)};
+ if(t==='meal'){r.meal_type=it.category;r.description=it.title;if(sbExt.meal){r.calories=it.calories;r.notes=it.notes||null}}
+ else{r.type=it.name;r.amount_ml=it.amount;if(sbExt.fluid)r.icon=it.icon}return r}
+async function sbDetect(){if(sbExtChecked)return;
+ for(const [t,c] of [['meal','id,calories,notes'],['fluid','id,icon']]){const {error}=await sb.from(SB_T[t]).select(c).limit(1);
+  const missing=error&&(['42703','PGRST204','PGRST100'].includes(error.code)||/column .* does not exist|could not find .* column/i.test(error.message||''));
+  if(error&&!missing)throw error;sbExt[t]=!error}sbExtChecked=true}
+async function sbInsert(t,row){let {data,error}=await sb.from(SB_T[t]).insert(row).select('id').single();
+ if(error&&error.code==='23502'&&/"id"/.test(error.message))({data,error}=await sb.from(SB_T[t]).insert({...row,id:Date.now()*1000+Math.floor(Math.random()*1000)}).select('id').single());
+ if(error)throw error;return data.id}
+async function sbPush(){
+ for(const [t,sid] of sbDelQ.slice()){const {error}=await sb.from(SB_T[t]).delete().eq('id',sid);if(error)throw error;
+  sbDelQ=sbDelQ.filter(x=>!(x[0]===t&&x[1]===sid));sbDelSave()}
+ for(const [date,d] of Object.entries(logs))for(const t of ['meal','fluid'])for(const it of d[SB_K[t]].slice()){
+  if(it.sid==null){it.sid=await sbInsert(t,toRow(t,it,date));delete it.dirty;save(false)}
+  else if(it.dirty){const {data,error}=await sb.from(SB_T[t]).update(toRow(t,it,date)).eq('id',it.sid).select('id');if(error)throw error;
+   if(!data.length)it.sid=await sbInsert(t,toRow(t,it,date));delete it.dirty;save(false)}}}
+async function sbFetch(t){const cols=t==='meal'?'id,created_at,meal_type,description'+(sbExt.meal?',calories,notes':''):'id,created_at,amount_ml,type'+(sbExt.fluid?',icon':'');
+ let all=[];for(let from=0;;from+=1000){const {data,error}=await sb.from(SB_T[t]).select(cols).order('id').range(from,from+999);if(error)throw error;all=all.concat(data);if(data.length<1000)break}return all}
+async function sbPull(){for(const t of ['meal','fluid']){const k=SB_K[t],rows=await sbFetch(t),seen=new Set(rows.map(r=>r.id)),idx=new Map();
+ for(const [date,d] of Object.entries(logs)){d[k]=d[k].filter(it=>it.sid==null||it.dirty||seen.has(it.sid));d[k].forEach(it=>{if(it.sid!=null)idx.set(it.sid,[it,date])})}
+ for(const r of rows){const [date,time]=fromTs(r.created_at);let [it,old]=idx.get(r.id)||[];if(it&&it.dirty)continue;
+  if(!it){it={id:Date.now()+Math.random(),sid:r.id};day(date)[k].push(it)}else if(old!==date){logs[old][k]=logs[old][k].filter(x=>x!==it);day(date)[k].push(it)}
+  it.time=time;
+  if(t==='meal'){it.title=r.description||'(ohne Beschreibung)';it.category=mapCat(r.meal_type,time);
+   if(sbExt.meal){it.calories=r.calories??null;it.notes=r.notes||''}else{if(!('calories' in it))it.calories=null;if(!('notes' in it))it.notes=''}}
+  else{it.name=r.type||'Wasser';it.amount=r.amount_ml||0;if(sbExt.fluid&&r.icon)it.icon=r.icon;else if(!it.icon)it.icon='🥛'}}}
+ save(false)}
+function sbSchedule(){if(!sb||!sbUser)return;clearTimeout(sbTimer);sbTimer=setTimeout(sbSync,800)}
+async function sbSync(){if(!sb||!sbUser)return;if(sbBusy){sbAgain=true;return}sbBusy=true;sbUI();
+ try{await sbDetect();await sbPush();await sbPull();sbLast=new Date();sbErr=null}catch(e){sbErr='Sync-Fehler: '+(e.message||e)+' – Daten bleiben lokal erhalten.'}
+ sbBusy=false;render();sbUI();if(sbAgain){sbAgain=false;sbSchedule()}}
+async function sbInit(){const c=sbCfg();$('sbUrl').value=c.url||'';$('sbKey').value=c.key||'';
+ if(sbConnect(c)){try{const {data}=await sb.auth.getSession();sbUser=data.session?data.session.user:null}catch(e){}}sbUI();if(sbUser)sbSync()}
+async function sbSignIn(e){e.preventDefault();
+ const c={url:$('sbUrl').value.trim().replace(/\/+$/,''),key:$('sbKey').value.trim()};
+ if(!/^https:\/\/\S+$/.test(c.url))return sbUI('Bitte eine gültige Projekt-URL (https://…) eintragen.');
+ if(!c.key)return sbUI('Bitte den anon/public key eintragen.');
+ store.set('nutritrack_supabase',JSON.stringify(c));if(!sbConnect(c))return;
+ $('sbStatus').textContent='Anmeldung läuft …';
+ try{const {data,error}=await sb.auth.signInWithPassword({email:$('sbMail').value.trim(),password:$('sbPw').value});
+  $('sbPw').value='';if(error)return sbUI(/invalid login/i.test(error.message)?'E-Mail oder Passwort falsch.':'Anmeldung fehlgeschlagen: '+error.message);
+  sbUser=data.user;sbUI()}catch(err){sbUI('Server nicht erreichbar. URL prüfen. ('+err.message+')')}}
+async function sbLogout(){if(sb)try{await sb.auth.signOut()}catch(e){}sbUser=null;sbUI()}
+async function sbForget(){if(!confirm('Supabase-Verbindung aus diesem Browser entfernen? Die Daten in Supabase bleiben erhalten.'))return;
+ await sbLogout();store.set('nutritrack_supabase','');sb=null;sbKeyCur='';$('sbUrl').value='';$('sbKey').value='';sbUI()}
 
 function init(){
  renderQuick();
+ $('sbBtn').onclick=()=>$('sbModal').classList.replace('hidden','flex');$('sbClose').onclick=()=>$('sbModal').classList.replace('flex','hidden');
+ $('sbLogin').onsubmit=sbSignIn;$('sbOut').onclick=sbLogout;$('sbNow').onclick=sbSync;
+ window.addEventListener('online',sbSchedule);document.addEventListener('visibilitychange',()=>{if(!document.hidden)sbSchedule()});$('sbForget').onclick=sbForget;sbInit();
+ $('expBtn').onclick=exportData;$('impBtn').onclick=()=>$('impFile').click();
+ $('impFile').onchange=e=>{const f=e.target.files[0];if(f)readImport(f)};
+ $('ioClose').onclick=closeImp;$('ioMerge').onclick=()=>applyImport(false);$('ioReplace').onclick=()=>applyImport(true);
  $('quick').onclick=e=>{const x=e.target.closest('[data-xq]');if(x){QUICK.splice(+x.dataset.xq,1);saveLists();renderQuick();return}if(editQ)return;const b=e.target.closest('[data-q]');if(b){const q=QUICK[b.dataset.q];askTime((q[2]||'')+' '+q[0]+' · '+q[1]+' ml',t=>addFluid(q[0],q[1],q[2],t))}};
  $('quickFood').onclick=e=>{const x=e.target.closest('[data-xf]');if(x){FOOD.splice(+x.dataset.xf,1);saveLists();renderQuick();return}if(editF)return;const b=e.target.closest('[data-f]');if(b){const i=+b.dataset.f,f=FOOD[i];askTime((f[2]||'')+' '+f[0],(t,c)=>addFood(i,t,c),f[3]||null)}};
  $('qEdit').onclick=()=>{editQ=!editQ;$('qAdd').classList.toggle('hidden',!editQ);$('qEdit').textContent=editQ?'✓ Fertig':'✏️ Bearbeiten';renderQuick()};
@@ -260,7 +411,7 @@ function init(){
   const name=$('eName').value.trim();if(!name)return;
   if(editing.t==='meal'){it.title=name;it.calories=$('eNum').value?parseInt($('eNum').value):null;it.category=$('eCat').value;it.notes=$('eNotes').value}
   else{const a=parseInt($('eNum').value);if(!a||a<1)return;it.name=name;it.amount=a}
-  it.time=$('eTime').value||it.time;save();closeEdit();render()};
+  it.time=$('eTime').value||it.time;it.dirty=true;save();closeEdit();render()};
 }
 
 function render(){
@@ -279,26 +430,30 @@ function render(){
   return `<div class="space-y-2"><div class="flex justify-between text-xs font-bold uppercase text-${c.c}-600 bg-${c.c}-50 px-3 py-1.5 rounded-lg"><span>${c.e} ${c.t}</span><span class="font-medium">${ms.reduce((s,m)=>s+(m.calories||0),0)} kcal</span></div>`+
   (ms.length?ms.map(m=>`<div class="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50"><div><span class="text-xs font-bold">${esc(m.title)}</span> <span class="text-[10px] px-1.5 py-0.5 bg-slate-200 rounded-md">${m.time} Uhr</span>${m.notes?`<p class="text-xs text-slate-500">${esc(m.notes)}</p>`:''}</div><div class="flex items-center gap-2">${m.calories?`<span class="text-xs font-semibold bg-white px-2 py-1 rounded-lg border border-slate-200">${m.calories} kcal</span>`:''}${del('delMeal',m.id)}</div></div>`).join(''):'<p class="text-xs text-slate-400 italic">Keine Einträge vorhanden.</p>')+'</div>'}).join('');
  h+=`<div class="space-y-2 pt-3 border-t border-slate-100"><div class="flex justify-between text-xs font-bold uppercase text-sky-600 bg-sky-50 px-3 py-1.5 rounded-lg"><span>💧 Getränke des Tages</span><span class="font-medium">${total} ml</span></div>`+
-  (d.fluids.length?d.fluids.map(f=>`<div class="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-sky-50/40"><div><span class="text-xs font-bold">${f.icon||'🥛'} ${esc(f.name)}</span> <span class="text-[10px] text-slate-400">${f.time} Uhr</span></div><div class="flex items-center gap-2"><span class="text-xs font-bold text-sky-700">${f.amount} ml</span>${del('delFluid',f.id)}</div></div>`).join(''):'<p class="text-xs text-slate-400 italic">Noch keine Getränke erfasst.</p>')+'</div>';
+  (d.fluids.length?d.fluids.map(f=>`<div class="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-sky-50/40"><div><span class="text-xs font-bold">${ico(f.icon)} ${esc(f.name)}</span> <span class="text-[10px] text-slate-400">${f.time} Uhr</span></div><div class="flex items-center gap-2"><span class="text-xs font-bold text-sky-700">${f.amount} ml</span>${del('delFluid',f.id)}</div></div>`).join(''):'<p class="text-xs text-slate-400 italic">Noch keine Getränke erfasst.</p>')+'</div>';
  $('log').innerHTML=h;
  drawChart();
 }
 
+const FB=[{k:'Morgens',c:'#7dd3fc'},{k:'Mittags',c:'#0ea5e9'},{k:'Abends',c:'#0369a1'}];
+const KC={Morgens:'#fbbf24',Mittags:'#fb923c',Abends:'#6366f1',Snacks:'#ec4899'};
+function fBucket(t){const h=parseInt((t||'12').slice(0,2));return h<10?'Morgens':h<15?'Mittags':'Abends'}
 function drawChart(){
- const labels=[],data=[],t=[],k=[];
+ const labels=[],t=[],k=[],fb={Morgens:[],Mittags:[],Abends:[]},kb={Morgens:[],Mittags:[],Abends:[],Snacks:[]};
  for(let i=6;i>=0;i--){const x=parse(sel);x.setDate(x.getDate()-i);
   labels.push(x.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}));
-  const e=logs[fmt(x)];data.push(e?e.fluids.reduce((s,f)=>s+f.amount,0):0);t.push(goal);k.push(e?e.meals.reduce((s,m)=>s+(m.calories||0),0):0)}
+  const e=logs[fmt(x)],F=e?e.fluids:[],M=e?e.meals:[];
+  FB.forEach(b=>fb[b.k].push(F.filter(f=>fBucket(f.time)===b.k).reduce((s,f)=>s+f.amount,0)));
+  CATS.forEach(c=>kb[c.k].push(M.filter(m=>m.category===c.k).reduce((s,m)=>s+(m.calories||0),0)));
+  t.push(goal);k.push(M.reduce((s,m)=>s+(m.calories||0),0))}
  if(chart)chart.destroy();
- chart=new Chart($('chart').getContext('2d'),{type:'bar',data:{labels,datasets:[
-  {label:'Getrunken (ml)',data,backgroundColor:'#0ea5e9',borderRadius:8,maxBarThickness:32},
-  {label:'Ziel (ml)',data:t,type:'line',borderColor:'#cbd5e1',borderWidth:2,borderDash:[5,5],pointRadius:0}]},
-  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'#f1f5f9'}},x:{grid:{display:false}}}}});
+ const opt=u=>({responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{boxWidth:12,filter:i=>!i.text.startsWith('Ziel')}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.raw+' '+u,footer:it=>'Summe: '+it.filter(i=>i.dataset.type!=='line').reduce((a,i)=>a+i.raw,0)+' '+u}}},scales:{y:{stacked:true,beginAtZero:true,grid:{color:'#f1f5f9'}},x:{stacked:true,grid:{display:false}}}});
+ const goalLine=(l,v)=>({label:l,data:v,type:'line',borderColor:'#94a3b8',borderWidth:2,borderDash:[5,5],pointRadius:0,stack:'goal'});
+ chart=new Chart($('chart').getContext('2d'),{type:'bar',data:{labels,datasets:[...FB.map(b=>({label:b.k,data:fb[b.k],backgroundColor:b.c,maxBarThickness:32})),goalLine('Ziel (ml)',t)]},options:opt('ml')});
  const used=k.filter(v=>v>0);
  $('kAvg').textContent=used.length?'Ø '+Math.round(used.reduce((a,b)=>a+b,0)/used.length)+' kcal an Tagen mit Einträgen':'Ø –';
  if(chartK)chartK.destroy();
- chartK=new Chart($('chartKcal').getContext('2d'),{type:'bar',data:{labels,datasets:[{label:'Kalorien (kcal)',data:k,backgroundColor:'#f59e0b',borderRadius:8,maxBarThickness:32},...(kGoal?[{label:'Ziel (kcal)',data:k.map(()=>kGoal),type:'line',borderColor:'#cbd5e1',borderWidth:2,borderDash:[5,5],pointRadius:0}]:[])]},
-  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+' kcal'}}},scales:{y:{beginAtZero:true,grid:{color:'#f1f5f9'}},x:{grid:{display:false}}}}});
+ chartK=new Chart($('chartKcal').getContext('2d'),{type:'bar',data:{labels,datasets:[...CATS.map(c=>({label:c.k,data:kb[c.k],backgroundColor:KC[c.k],maxBarThickness:32})),...(kGoal?[goalLine('Ziel (kcal)',k.map(()=>kGoal))]:[])]},options:opt('kcal')});
 }
 init();render();
 </script>
