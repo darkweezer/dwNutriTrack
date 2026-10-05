@@ -460,10 +460,12 @@ function drawChart(){
  const goalLine=(l,v)=>({label:l,data:v,type:'line',borderColor:'#94a3b8',borderWidth:2,borderDash:[5,5],pointRadius:0,stack:'goal'});
  const cSum=cups.reduce((a,b)=>a+b,0),cMl=CB.reduce((s,b)=>s+cb[b.k].reduce((a,v)=>a+v,0),0);
  $('cAvg').textContent=cSum?'☕ Ø '+(cSum/7).toLocaleString('de-DE',{maximumFractionDigits:1})+' Tassen pro Tag · '+cSum+' Tassen / '+cMl+' ml in 7 Tagen':'☕ noch kein Kaffee erfasst';
+ // Säulenpaar eng beieinander: kein Breiten-Limit (sonst wächst die Lücke), Breite über categoryPercentage
+ const BP={barPercentage:0.94,categoryPercentage:0.6};
  const of=opt('ml'),sum=(o,i)=>Object.values(o).reduce((a,v)=>a+v[i],0);
  of.plugins.tooltip.filter=i=>i.dataset.type==='line'||i.raw>0;
  of.plugins.tooltip.callbacks.footer=it=>{const i=it[0].dataIndex,c=sum(cb,i);return ['Getränke gesamt: '+sum(fb,i)+' ml',...(c?['☕ davon Kaffee: '+c+' ml · '+cups[i]+(cups[i]===1?' Tasse':' Tassen')]:[])]};
- chart=new Chart($('chart').getContext('2d'),{type:'bar',data:{labels,datasets:[...FB.map(b=>({label:b.k,data:fb[b.k],backgroundColor:b.c,stack:'all',maxBarThickness:28})),...CB.map(b=>({label:'☕ '+b.k,data:cb[b.k],backgroundColor:b.c,stack:'coffee',maxBarThickness:28})),goalLine('Ziel (ml)',t)]},options:of});
+ chart=new Chart($('chart').getContext('2d'),{type:'bar',data:{labels,datasets:[...FB.map(b=>({label:b.k,data:fb[b.k],backgroundColor:b.c,stack:'all',...BP})),...CB.map(b=>({label:'☕ '+b.k,data:cb[b.k],backgroundColor:b.c,stack:'coffee',...BP})),goalLine('Ziel (ml)',t)]},options:of});
  const used=k.filter(v=>v>0);
  $('kAvg').textContent=used.length?'Ø '+Math.round(used.reduce((a,b)=>a+b,0)/used.length)+' kcal an Tagen mit Einträgen':'Ø –';
  if(chartK)chartK.destroy();
