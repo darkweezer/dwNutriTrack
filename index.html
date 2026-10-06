@@ -236,7 +236,7 @@ const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},se
 let logs={};try{logs=JSON.parse(store.get('nutritrack_data_v1')||'{}')}catch(e){}
 function loadList(k,def){try{const v=JSON.parse(store.get(k));if(Array.isArray(v))return v}catch(e){}return def.map(x=>x.slice())}
 let QUICK=loadList('nutritrack_quick_drinks',QUICK_DEF),FOOD=loadList('nutritrack_quick_food',FOOD_DEF),editQ=false,editF=false;
-function saveLists(){store.set('nutritrack_quick_drinks',JSON.stringify(QUICK));store.set('nutritrack_quick_food',JSON.stringify(FOOD))}
+function saveLists(){store.set('nutritrack_quick_drinks',JSON.stringify(QUICK));store.set('nutritrack_quick_food',JSON.stringify(FOOD));store.set('nutritrack_lists_dirty','1');if(typeof sbSchedule==='function')sbSchedule()}
 function renderQuick(){
  const tile=(a,i,k,col,sub,ed)=>`<div class="relative"><button data-${k}="${i}" class="w-full p-3 rounded-xl border border-slate-200 hover:border-${col}-400 hover:bg-${col}-50 transition text-center"><div class="text-2xl">${esc(a[2]||'🍽️')}</div><div class="text-xs font-semibold">${esc(a[0])}</div><div class="text-[11px] text-slate-400">${sub}</div></button>${ed?`<button data-x${k}="${i}" title="Entfernen" class="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white text-xs shadow">✕</button>`:''}</div>`;
 
@@ -366,9 +366,22 @@ async function sbPull(){for(const t of ['meal','fluid']){const k=SB_K[t],rows=aw
    if(sbExt.meal){it.calories=r.calories??null;it.notes=r.notes||''}else{if(!('calories' in it))it.calories=null;if(!('notes' in it))it.notes=''}}
   else{it.name=r.type||'Wasser';it.amount=r.amount_ml||0;if(sbExt.fluid&&r.icon)it.icon=r.icon;else if(!it.icon)it.icon='🥛'}}}
  save(false)}
+// Schnellauswahl-Listen: Tabelle app_settings (key text primary key, value jsonb, updated_at timestamptz)
+async function sbLists(){const T='app_settings',keys={quick_drinks:()=>QUICK,quick_food:()=>FOOD};
+ const up=async()=>{const rows=Object.entries(keys).map(([k,g])=>({key:k,value:g(),updated_at:new Date().toISOString()}));
+  const {error}=await sb.from(T).upsert(rows,{onConflict:'key'});if(error)throw error;store.set('nutritrack_lists_dirty','')};
+ try{
+  if(store.get('nutritrack_lists_dirty')){await up();return null}
+  const {data,error}=await sb.from(T).select('key,value').in('key',Object.keys(keys));if(error)throw error;
+  const m=Object.fromEntries(data.map(r=>[r.key,r.value]));
+  if(!data.length){await up();return null}
+  if(Array.isArray(m.quick_drinks))QUICK=m.quick_drinks.filter(Array.isArray);
+  if(Array.isArray(m.quick_food))FOOD=m.quick_food.filter(Array.isArray);
+  store.set('nutritrack_quick_drinks',JSON.stringify(QUICK));store.set('nutritrack_quick_food',JSON.stringify(FOOD));renderQuick();return null
+ }catch(e){if(['42P01','PGRST205'].includes(e.code)||/app_settings/.test(e.message||''))return 'Schnellauswahl nicht synchronisiert: Tabelle „app_settings“ fehlt in Supabase.';throw e}}
 function sbSchedule(){if(!sb||!sbUser)return;clearTimeout(sbTimer);sbTimer=setTimeout(sbSync,800)}
 async function sbSync(){if(!sb||!sbUser)return;if(sbBusy){sbAgain=true;return}sbBusy=true;sbUI();
- try{await sbDetect();await sbPush();await sbPull();sbLast=new Date();sbErr=null}catch(e){sbErr='Sync-Fehler: '+(e.message||e)+' – Daten bleiben lokal erhalten.'}
+ try{await sbDetect();await sbPush();await sbPull();sbErr=await sbLists();sbLast=new Date()}catch(e){sbErr='Sync-Fehler: '+(e.message||e)+' – Daten bleiben lokal erhalten.'}
  sbBusy=false;render();sbUI();if(sbAgain){sbAgain=false;sbSchedule()}}
 async function sbInit(){const c=sbCfg();$('sbUrl').value=c.url||'';$('sbKey').value=c.key||'';
  if(sbConnect(c)){try{const {data}=await sb.auth.getSession();sbUser=data.session?data.session.user:null}catch(e){}}sbUI();if(sbUser)sbSync()}
