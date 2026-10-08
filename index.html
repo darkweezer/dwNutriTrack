@@ -17,19 +17,19 @@ body{background:#f8fafc;font-family:Inter,system-ui,-apple-system,"Segoe UI",san
 <header class="bg-white border-b border-slate-200 sticky top-0 z-30" style="top:env(safe-area-inset-top,0px)">
  <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
   <div class="flex items-center gap-2 sm:gap-3">
-   <div class="bg-gradient-to-tr from-sky-500 to-indigo-600 w-10 h-10 rounded-xl flex items-center justify-center text-xl">🍽️</div>
+   <div class="bg-gradient-to-tr from-sky-500 to-indigo-600 w-10 h-10 rounded-xl hidden sm:flex items-center justify-center text-xl">🍽️</div>
    <div class="hidden sm:block"><h1 class="font-bold leading-tight">NutriTrack</h1><p class="hidden sm:block text-xs text-slate-500">Dein Ess- & Trink-Tagebuch</p></div>
   </div>
   <div class="flex items-center gap-1 sm:gap-2">
   <button id="expBtn" title="Daten exportieren (JSON)" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200">⬇️</button>
   <button id="impBtn" title="Daten importieren (JSON)" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200">⬆️</button>
   <input id="impFile" type="file" accept=".json,application/json" class="hidden">
-  <button id="sbBtn"title="Cloud-Sync (Supabase)" class="relative w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200">☁️<span id="sbDot" class="absolute top-1 right-1 w-2 h-2 rounded-full bg-slate-300"></span></button>
+  <button id="sbBtn" title="Cloud-Sync (Supabase)" class="relative w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200">☁️<span id="sbDot" class="absolute top-1 right-1 w-2 h-2 rounded-full bg-slate-300"></span></button>
   <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
    <button id="prev" class="px-2 py-1 rounded-lg hover:bg-white">‹</button>
    <input type="date" id="date" class="bg-transparent text-sm font-semibold text-center w-28 sm:w-32">
    <button id="next" class="px-2 py-1 rounded-lg hover:bg-white">›</button>
-   <button id="today" class="hidden sm:block text-xs font-semibold px-2 py-1 bg-white text-sky-600 rounded-lg">Heute</button>
+   <button id="today" class="hidden sm:block text-xs font-semibold px-1.5 sm:px-2 py-1 bg-white text-sky-600 rounded-lg">Heute</button>
   </div></div>
  </div>
 </header>
@@ -248,7 +248,8 @@ function day(s){return logs[s]||(logs[s]={meals:[],fluids:[]})}
 function save(sync=true){store.set('nutritrack_data_v1',JSON.stringify(logs));if(sync&&typeof sbSchedule==='function')sbSchedule()}
 function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
 function shift(n){const d=parse(sel);d.setDate(d.getDate()+n);setDate(fmt(d))}
-function setDate(s){sel=s;$('date').value=s;$('mTime').value=nowT();render()}
+function pickCat(){const r=document.querySelector(`input[name=cat][value="${autoCat($('mTime').value)}"]`);if(r)r.checked=true}
+function setDate(s){sel=s;$('date').value=s;$('mTime').value=nowT();pickCat();render()}
 
 function addFluid(name,amt,icon,time){day(sel).fluids.push({id:Date.now()+Math.random(),name,amount:parseInt(amt),time:time||nowT(),icon:icon||'🥛'});save();render()}
 let pendingAdd=null;
@@ -295,8 +296,10 @@ function readImport(file){const fr=new FileReader();fr.onload=()=>{let j;try{j=J
  $('ioModal').classList.replace('hidden','flex')};fr.readAsText(file)}
 function applyImport(replace){if(!pendingImp)return;const {data,j}=pendingImp;
  if(replace){if(!confirm('Wirklich alle bisherigen Einträge durch die Datei ersetzen?'))return;logs=data}
- else for(const [k,v] of Object.entries(data)){const d=day(k);
-  ['meals','fluids'].forEach(t=>{const ids=new Set(d[t].map(x=>x.id));v[t].forEach(x=>{if(!ids.has(x.id))d[t].push(x)})})}
+ else{// Abgleich über lokale id und Supabase-id (sid), sonst Duplikate bei Backups von anderen Geräten
+  const sids={meals:new Set(),fluids:new Set()};Object.values(logs).forEach(d=>['meals','fluids'].forEach(t=>d[t].forEach(x=>{if(x.sid!=null)sids[t].add(x.sid)})));
+  for(const [k,v] of Object.entries(data)){const d=day(k);
+   ['meals','fluids'].forEach(t=>{const ids=new Set(d[t].map(x=>x.id));v[t].forEach(x=>{if(!ids.has(x.id)&&(x.sid==null||!sids[t].has(x.sid)))d[t].push(x)})})}}
  if(j.data&&$('ioSet').checked){
   if(parseInt(j.fluidGoal)>=500){goal=parseInt(j.fluidGoal);store.set('nutritrack_fluid_goal',goal)}
   if('kcalGoal' in j){kGoal=parseInt(j.kcalGoal)||null;store.set('nutritrack_kcal_goal',kGoal||'')}
@@ -346,15 +349,18 @@ async function sbInsert(t,row){let {data,error}=await sb.from(SB_T[t]).insert(ro
 async function sbPush(){
  for(const [t,sid] of sbDelQ.slice()){const {error}=await sb.from(SB_T[t]).delete().eq('id',sid);if(error)throw error;
   sbDelQ=sbDelQ.filter(x=>!(x[0]===t&&x[1]===sid));sbDelSave()}
- for(const [date,d] of Object.entries(logs))for(const t of ['meal','fluid'])for(const it of d[SB_K[t]].slice()){
-  if(it.sid==null){it.sid=await sbInsert(t,toRow(t,it,date));delete it.dirty;save(false)}
+ // Während eines await kann der Eintrag gelöscht (→ neue Zeile gleich wieder löschen) oder bearbeitet werden (rev geändert → dirty behalten)
+ const alive=(t,it)=>Object.values(logs).some(x=>x[SB_K[t]].includes(it));
+ const done=(t,it,rev,sid)=>{if(!alive(t,it)){if(sid!=null)sbQueueDel(t,sid);sbAgain=true}else if(it.rev===rev)delete it.dirty;save(false)};
+ for(const [date,d] of Object.entries(logs))for(const t of ['meal','fluid'])for(const it of d[SB_K[t]].slice()){const rev=it.rev;
+  if(it.sid==null){const sid=await sbInsert(t,toRow(t,it,date));it.sid=sid;done(t,it,rev,sid)}
   else if(it.dirty){const {data,error}=await sb.from(SB_T[t]).update(toRow(t,it,date)).eq('id',it.sid).select('id');if(error)throw error;
-   if(!data.length)it.sid=await sbInsert(t,toRow(t,it,date));delete it.dirty;save(false)}}}
+   let sid=null;if(!data.length)sid=it.sid=await sbInsert(t,toRow(t,it,date));done(t,it,rev,sid)}}}
 async function sbFetch(t){const cols=t==='meal'?'id,created_at,meal_type,description'+(sbExt.meal?',calories,notes':''):'id,created_at,amount_ml,type'+(sbExt.fluid?',icon':'');
  let all=[];for(let from=0;;from+=1000){const {data,error}=await sb.from(SB_T[t]).select(cols).order('id').range(from,from+999);if(error)throw error;all=all.concat(data);if(data.length<1000)break}return all}
-async function sbPull(){for(const t of ['meal','fluid']){const k=SB_K[t],rows=await sbFetch(t),seen=new Set(rows.map(r=>r.id)),idx=new Map();
+async function sbPull(){for(const t of ['meal','fluid']){const k=SB_K[t],rows=await sbFetch(t),seen=new Set(rows.map(r=>r.id)),idx=new Map(),gone=new Set(sbDelQ.filter(x=>x[0]===t).map(x=>x[1]));
  for(const [date,d] of Object.entries(logs)){d[k]=d[k].filter(it=>it.sid==null||it.dirty||seen.has(it.sid));d[k].forEach(it=>{if(it.sid!=null)idx.set(it.sid,[it,date])})}
- for(const r of rows){const [date,time]=fromTs(r.created_at);let [it,old]=idx.get(r.id)||[];if(it&&it.dirty)continue;
+ for(const r of rows){if(gone.has(r.id))continue;const [date,time]=fromTs(r.created_at);let [it,old]=idx.get(r.id)||[];if(it&&it.dirty)continue;
   if(!it){it={id:Date.now()+Math.random(),sid:r.id};day(date)[k].push(it)}else if(old!==date){logs[old][k]=logs[old][k].filter(x=>x!==it);day(date)[k].push(it)}
   it.time=time;
   if(t==='meal'){it.title=r.description||'(ohne Beschreibung)';it.category=mapCat(r.meal_type,time);
@@ -416,10 +422,11 @@ function init(){
  $('mealForm').onsubmit=e=>{e.preventDefault();
   day(sel).meals.push({id:Date.now()+Math.random(),category:document.querySelector('input[name=cat]:checked').value,title:$('mTitle').value,calories:$('mKcal').value?parseInt($('mKcal').value):null,time:$('mTime').value,notes:$('mNotes').value});
   save();render();$('mTitle').value='';$('mKcal').value='';$('mNotes').value=''};
+ $('mTime').oninput=pickCat;
  $('goalBtn').onclick=()=>{$('goalIn').value=goal;$('modal').classList.replace('hidden','flex')};
  $('mClose').onclick=()=>$('modal').classList.replace('flex','hidden');
  $('goalSave').onclick=()=>{const v=parseInt($('goalIn').value);if(v>=500){goal=v;store.set('nutritrack_fluid_goal',v);$('modal').classList.replace('flex','hidden');render()}};
- $('date').value=sel;$('mTime').value=nowT();
+ $('date').value=sel;$('mTime').value=nowT();pickCat();
  $('tClose').onclick=closeTime;
  $('tTime').oninput=()=>{if(tCatAuto)$('tCat').value=autoCat($('tTime').value)};
  $('tCat').onchange=()=>{tCatAuto=false};
@@ -433,13 +440,13 @@ function init(){
   const name=$('eName').value.trim();if(!name)return;
   if(editing.t==='meal'){it.title=name;it.calories=$('eNum').value?parseInt($('eNum').value):null;it.category=$('eCat').value;it.notes=$('eNotes').value}
   else{const a=parseInt($('eNum').value);if(!a||a<1)return;it.name=name;it.amount=a}
-  it.time=$('eTime').value||it.time;it.dirty=true;save();closeEdit();render()};
+  it.time=$('eTime').value||it.time;it.dirty=true;it.rev=(it.rev||0)+1;save();closeEdit();render()};
 }
 
 function render(){
  const d=day(sel), total=d.fluids.reduce((s,f)=>s+f.amount,0), pct=Math.min(100,Math.round(total/goal*100));
  $('tgt').textContent=goal;$('legTgt').textContent=goal;$('cur').textContent=total;$('pct').textContent=pct+'%';$('bar').style.width=pct+'%';
- $('mcount').textContent=d.meals.length;
+ $('mcount').textContent=d.meals.length;$('today').classList.toggle('hidden',sel===fmt(new Date())); // Mobil nur sichtbar, wenn nicht heute
  const kc=d.meals.reduce((s,m)=>s+(m.calories||0),0);$('kcal').textContent=kc;
  $('kUnit').textContent=kGoal?'':'kcal';$('kGoalTxt').textContent=kGoal?' / '+kGoal+' kcal':'';
  $('kBarWrap').classList.toggle('hidden',!kGoal);
@@ -448,12 +455,13 @@ function render(){
  $('catCounts').innerHTML=CATS.map(c=>`<div><span class="block text-slate-400 text-[10px]">${c.k}</span><span class="font-bold">${d.meals.filter(m=>m.category===c.k).length}</span></div>`).join('');
  $('dlabel').textContent=$('dlabel2').textContent=parse(sel).toLocaleDateString('de-DE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
  const del=(fn,id)=>{const t=fn==='delMeal'?'meal':'fluid';return `<button onclick="openEdit('${t}',${id})" class="text-slate-400 hover:text-sky-600 p-1" title="Bearbeiten" aria-label="Bearbeiten">✏️</button><button onclick="${fn}(${id})" class="text-slate-400 hover:text-red-500 p-1" title="Löschen" aria-label="Löschen">🗑️</button>`};
- let h=CATS.map(c=>{const ms=d.meals.filter(m=>m.category===c.k);
+ const byT=(a,b)=>String(a.time||'').localeCompare(String(b.time||''));
+ let h=CATS.map(c=>{const ms=d.meals.filter(m=>m.category===c.k).sort(byT);
   return `<div class="space-y-2"><div class="flex justify-between text-xs font-bold uppercase text-${c.c}-600 bg-${c.c}-50 px-3 py-1.5 rounded-lg"><span>${c.e} ${c.t}</span><span class="font-medium">${ms.reduce((s,m)=>s+(m.calories||0),0)} kcal</span></div>`+
   (ms.length?ms.map(m=>`<div class="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50"><div><span class="text-xs font-bold">${esc(m.title)}</span> <span class="text-[10px] px-1.5 py-0.5 bg-slate-200 rounded-md">${m.time} Uhr</span>${m.notes?`<p class="text-xs text-slate-500">${esc(m.notes)}</p>`:''}</div><div class="flex items-center gap-2">${m.calories?`<span class="text-xs font-semibold bg-white px-2 py-1 rounded-lg border border-slate-200">${m.calories} kcal</span>`:''}${del('delMeal',m.id)}</div></div>`).join(''):'<p class="text-xs text-slate-400 italic">Keine Einträge vorhanden.</p>')+'</div>'}).join('');
  $('log').innerHTML=h;
  $('logFluid').innerHTML=`<div class="flex justify-between text-xs font-bold uppercase text-sky-600 bg-sky-50 px-3 py-1.5 rounded-lg"><span>💧 Getränke des Tages</span><span class="font-medium">${total} ml</span></div>`+
-  (d.fluids.length?d.fluids.map(f=>`<div class="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-sky-50/40"><div><span class="text-xs font-bold">${ico(f.icon)} ${esc(f.name)}</span> <span class="text-[10px] text-slate-400">${f.time} Uhr</span></div><div class="flex items-center gap-2"><span class="text-xs font-bold text-sky-700">${f.amount} ml</span>${del('delFluid',f.id)}</div></div>`).join(''):'<p class="text-xs text-slate-400 italic">Noch keine Getränke erfasst.</p>');
+  (d.fluids.length?[...d.fluids].sort(byT).map(f=>`<div class="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-sky-50/40"><div><span class="text-xs font-bold">${ico(f.icon)} ${esc(f.name)}</span> <span class="text-[10px] text-slate-400">${f.time} Uhr</span></div><div class="flex items-center gap-2"><span class="text-xs font-bold text-sky-700">${f.amount} ml</span>${del('delFluid',f.id)}</div></div>`).join(''):'<p class="text-xs text-slate-400 italic">Noch keine Getränke erfasst.</p>');
  drawChart();
 }
 
